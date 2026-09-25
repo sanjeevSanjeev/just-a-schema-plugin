@@ -44,7 +44,7 @@ class Schema_Completeness {
 
 		$groups     = array();
 		$all_scores = array();
-		foreach ( Schema_Linked_Entity_Types::get_registry() as $entity_type => $config ) {
+		foreach ( Schema_Linked_Entity_Types::get_enabled_registry() as $entity_type => $config ) {
 			$items = array();
 			foreach ( Schema_Linked_Entity_Store::get_all( $entity_type ) as $row ) {
 				$item         = self::score_linked( new Schema_Linked_Content_Entity( $row ), $entity_type, $config );
@@ -54,7 +54,7 @@ class Schema_Completeness {
 			$groups[] = array(
 				'entity_type' => $entity_type,
 				'label'       => $config['label'],
-				'edit_url'    => admin_url( 'admin.php?page=' . Schema_Admin::linked_entity_page_slug( $entity_type ) ),
+				'edit_url'    => Schema_Admin::linked_entity_page_url( $entity_type ),
 				'note'        => 'service' === $entity_type
 					? __( 'Google has no rich result for services, so only required fields are scored.', 'schema-plugin' )
 					: '',
@@ -77,7 +77,7 @@ class Schema_Completeness {
 	private static function score_entity(): array {
 		$type     = Schema_Entity_Registry::get_entity_type();
 		// admin_url(), not menu_page_url(): menus aren't registered in REST requests.
-		$edit_url = admin_url( 'admin.php?page=' . Schema_Admin::PAGE_ENTITY );
+		$edit_url = Schema_Admin::page_url( Schema_Admin::PAGE_SETTINGS, 'entity' );
 
 		if ( '' === $type ) {
 			return array(

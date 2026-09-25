@@ -141,3 +141,7 @@ export function saveNetworkIdentity( data ) {
 export function getCompleteness() {
 	return apiFetch( { path: `${ NAMESPACE }/dashboard/completeness` } );
 }
+
+export function saveFeatures( enabled ) {
+	return apiFetch( { path: `${ NAMESPACE }/features`, method: 'POST', data: { enabled } } );
+}

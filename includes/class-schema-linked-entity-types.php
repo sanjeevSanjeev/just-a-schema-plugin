@@ -272,6 +272,15 @@ class Schema_Linked_Entity_Types {
 		);
 	}
 
+	/**
+	 * Only the types whose feature is switched on (Schema_Features). Use
+	 * this for anything that emits, lists or scores entities; get_config()
+	 * stays unfiltered for plain config lookups.
+	 */
+	public static function get_enabled_registry(): array {
+		return array_intersect_key( self::get_registry(), array_flip( Schema_Features::get_enabled() ) );
+	}
+
 	public static function get_config( string $entity_type ): ?array {
 		$registry = self::get_registry();
 		return $registry[ $entity_type ] ?? null;

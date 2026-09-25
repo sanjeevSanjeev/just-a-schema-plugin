@@ -122,20 +122,40 @@ class Schema_Rest_Controller {
 
 		register_rest_route(
 			self::NAMESPACE_V1,
-			'/network-identity',
+			'/features',
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( __CLASS__, 'get_network_identity' ),
+					'callback'            => array( __CLASS__, 'get_features' ),
 					'permission_callback' => array( __CLASS__, 'can_manage_options' ),
 				),
 				array(
 					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( __CLASS__, 'save_network_identity' ),
+					'callback'            => array( __CLASS__, 'save_features' ),
 					'permission_callback' => array( __CLASS__, 'can_manage_options' ),
 				),
 			)
 		);
+
+		// Only registered while the Network identity feature is on.
+		if ( Schema_Features::is_enabled( 'network' ) ) {
+			register_rest_route(
+				self::NAMESPACE_V1,
+				'/network-identity',
+				array(
+					array(
+						'methods'             => WP_REST_Server::READABLE,
+						'callback'            => array( __CLASS__, 'get_network_identity' ),
+						'permission_callback' => array( __CLASS__, 'can_manage_options' ),
+					),
+					array(
+						'methods'             => WP_REST_Server::CREATABLE,
+						'callback'            => array( __CLASS__, 'save_network_identity' ),
+						'permission_callback' => array( __CLASS__, 'can_manage_options' ),
+					),
+				)
+			);
+		}
 
 		register_rest_route(
 			self::NAMESPACE_V1,
@@ -455,6 +475,17 @@ class Schema_Rest_Controller {
 		}
 
 		return new WP_REST_Response( $results );
+	}
+
+	// -- /features --------------------------------------------------------------
+
+	public static function get_features(): WP_REST_Response {
+		return new WP_REST_Response( Schema_Features::get_status() );
+	}
+
+	public static function save_features( WP_REST_Request $request ): WP_REST_Response {
+		Schema_Features::set_enabled( (array) $request->get_param( 'enabled' ) );
+		return self::get_features();
 	}
 
 	// -- /network-identity ----------------------------------------------------

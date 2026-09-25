@@ -24,32 +24,42 @@ define( 'SCHEMA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SCHEMA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Data layer, in dependency order.
+ * Classes load on first use, so a frontend request only loads what wp_head
+ * touches; the REST controllers, sanitizer, admin and completeness code
+ * never load for visitors. Explicit map: three scaffolded files predate
+ * the class-schema-* naming.
  */
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-settings.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-types.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-sanitizer.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-field-migrator.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-token-resolver.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-network-identity.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-entity-registry.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-linked-content-entity.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-entity-resolver.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-post-meta.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-default-rules.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-graph-builder.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-dashboard.php';
-// v1.1 Phase 1 (Generic Linked Entity Manager) -- wired into
-// Schema_Entity_Registry's linked-entity methods above.
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-linked-entity-types.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-linked-entity-store.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-author-profile.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-rest-controller.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-linked-entity-rest-controller.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-activation.php';
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-completeness.php';
-// Always loaded (REST handlers use its page slugs); only init()'d in admin.
-require_once SCHEMA_PLUGIN_DIR . 'includes/class-schema-admin.php';
+spl_autoload_register(
+	static function ( string $class_name ): void {
+		static $map = array(
+			'Schema_Activation'                    => 'class-schema-activation.php',
+			'Schema_Admin'                         => 'class-schema-admin.php',
+			'Schema_Author_Profile'                => 'class-schema-author-profile.php',
+			'Schema_Completeness'                  => 'class-schema-completeness.php',
+			'Schema_Dashboard'                     => 'class-schema-dashboard.php',
+			'Schema_Default_Rules'                 => 'class-schema-default-rules.php',
+			'Schema_Entity_Registry'               => 'class-schema-entity-registry.php',
+			'Schema_Entity_Resolver'               => 'class-entity-resolver.php',
+			'Schema_Features'                      => 'class-schema-features.php',
+			'Schema_Field_Migrator'                => 'class-schema-field-migrator.php',
+			'Schema_Graph_Builder'                 => 'class-graph-builder.php',
+			'Schema_Linked_Content_Entity'         => 'class-linked-content-entity.php',
+			'Schema_Linked_Entity_Rest_Controller' => 'class-schema-linked-entity-rest-controller.php',
+			'Schema_Linked_Entity_Store'           => 'class-schema-linked-entity-store.php',
+			'Schema_Linked_Entity_Types'           => 'class-schema-linked-entity-types.php',
+			'Schema_Network_Identity'              => 'class-schema-network-identity.php',
+			'Schema_Post_Meta'                     => 'class-schema-post-meta.php',
+			'Schema_Rest_Controller'               => 'class-schema-rest-controller.php',
+			'Schema_Sanitizer'                     => 'class-schema-sanitizer.php',
+			'Schema_Settings'                      => 'class-schema-settings.php',
+			'Schema_Token_Resolver'                => 'class-schema-token-resolver.php',
+			'Schema_Types'                         => 'class-schema-types.php',
+		);
+		if ( isset( $map[ $class_name ] ) ) {
+			require_once SCHEMA_PLUGIN_DIR . 'includes/' . $map[ $class_name ];
+		}
+	}
+);
 
 register_activation_hook( __FILE__, array( 'Schema_Activation', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Schema_Activation', 'deactivate' ) );
@@ -64,12 +74,21 @@ function schema_plugin_bootstrap(): void {
 		dirname( plugin_basename( SCHEMA_PLUGIN_FILE ) ) . '/languages'
 	);
 
+	// Creates the features option on first run after upgrading (enabling
+	// whatever already has data); a no-op afterwards.
+	Schema_Features::maybe_upgrade();
+
 	Schema_Graph_Builder::init();
-	Schema_Author_Profile::init();
-	Schema_Rest_Controller::init();
-	Schema_Linked_Entity_Rest_Controller::init();
+
+	// Class-string callables: the controllers only load when REST runs.
+	add_action( 'rest_api_init', array( 'Schema_Rest_Controller', 'register_routes' ) );
+	add_action( 'rest_api_init', array( 'Schema_Linked_Entity_Rest_Controller', 'register_routes' ) );
 
 	if ( is_admin() ) {
 		Schema_Admin::init();
+		// Profile screen fields belong to the "Team & authors" feature.
+		if ( Schema_Features::is_enabled( 'team' ) ) {
+			Schema_Author_Profile::init();
+		}
 	}
 }

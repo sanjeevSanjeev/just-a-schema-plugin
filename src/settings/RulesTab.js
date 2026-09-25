@@ -1,10 +1,9 @@
-import { createRoot, useEffect, useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import DefaultRulesManager from '../shared/DefaultRulesManager';
 import { getEntity, resetDefaultRulesToType } from '../shared/api';
 import { getWizardCopy } from '../shared/wizardCopy';
-import '../shared/style.scss';
 
 const bootstrap = window.SchemaPluginData || {};
 
@@ -15,7 +14,7 @@ const bootstrap = window.SchemaPluginData || {};
  * default rules for this type" action here too rather than only inside
  * the wizard's re-run flow.
  */
-function DefaultRulesPage() {
+export default function RulesTab() {
 	const [ entityType, setEntityType ] = useState( undefined );
 	const [ resetKey, setResetKey ] = useState( 0 );
 
@@ -46,11 +45,8 @@ function DefaultRulesPage() {
 	};
 
 	return (
-		<div className="schema-default-rules-page schema-page schema-page-wide schema-card">
-			<p className="schema-breadcrumb">
-				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
-			</p>
-			<h1>{ __( 'Default Rules', 'schema-plugin' ) }</h1>
+		<div className="schema-default-rules-page schema-settings-tab">
+			<h2>{ __( 'Default Rules', 'schema-plugin' ) }</h2>
 			<p className="schema-wizard-step-intro">
 				{ entityType
 					? copy.rules_intro
@@ -71,9 +67,4 @@ function DefaultRulesPage() {
 			<DefaultRulesManager key={ resetKey } />
 		</div>
 	);
-}
-
-const container = document.getElementById( 'schema-plugin-rules-root' );
-if ( container ) {
-	createRoot( container ).render( <DefaultRulesPage /> );
 }

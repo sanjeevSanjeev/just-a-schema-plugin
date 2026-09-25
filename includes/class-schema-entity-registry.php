@@ -186,7 +186,8 @@ class Schema_Entity_Registry {
 	 */
 	public static function get_all_linked_entities(): array {
 		$entities = array();
-		foreach ( array_keys( Schema_Linked_Entity_Types::get_registry() ) as $entity_type ) {
+		// Disabled features' options aren't even read.
+		foreach ( array_keys( Schema_Linked_Entity_Types::get_enabled_registry() ) as $entity_type ) {
 			foreach ( Schema_Linked_Entity_Store::get_all( $entity_type ) as $row ) {
 				$entities[] = new Schema_Linked_Content_Entity( $row );
 			}

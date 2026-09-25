@@ -1,10 +1,7 @@
-import { createRoot, useEffect, useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Button, TextControl, ToggleControl, Notice, Spinner } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { getExclusions, saveExclusions } from '../shared/api';
-import '../shared/style.scss';
-
-const bootstrap = window.SchemaPluginData || {};
 
 /**
  * Exclusions settings page (new -- CLAUDE.md Section 3.5's backend
@@ -14,7 +11,7 @@ const bootstrap = window.SchemaPluginData || {};
  * shown here -- CLAUDE.md Section 3.5 keeps those hardcoded, never
  * editable UI.
  */
-function ExclusionsPage() {
+export default function ExclusionsTab() {
 	const [ data, setData ] = useState( null );
 	const [ saving, setSaving ] = useState( false );
 	const [ saved, setSaved ] = useState( false );
@@ -61,11 +58,8 @@ function ExclusionsPage() {
 	};
 
 	return (
-		<div className="schema-exclusions-page schema-page schema-page-wide schema-card">
-			<p className="schema-breadcrumb">
-				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
-			</p>
-			<h1>{ __( 'Exclusions', 'schema-plugin' ) }</h1>
+		<div className="schema-exclusions-page schema-settings-tab">
+			<h2>{ __( 'Exclusions', 'schema-plugin' ) }</h2>
 			<p className="schema-wizard-step-intro">
 				{ __(
 					'Pages matching any of these patterns never get schema output. wp-admin, feeds, and similar system pages are always excluded and not shown here.',
@@ -146,9 +140,4 @@ function ExclusionsPage() {
 			) }
 		</div>
 	);
-}
-
-const container = document.getElementById( 'schema-plugin-exclusions-root' );
-if ( container ) {
-	createRoot( container ).render( <ExclusionsPage /> );
 }

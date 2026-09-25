@@ -141,7 +141,10 @@ class Schema_Author_Profile {
 			return array();
 		}
 
-		$same_as = self::get_same_as( $user_id );
+		// Profile schema fields belong to the "Team & authors" feature; with
+		// it off, the fallback Person uses core profile data only.
+		$team    = Schema_Features::is_enabled( 'team' );
+		$same_as = $team ? self::get_same_as( $user_id ) : array();
 		if ( $user->user_url ) {
 			array_unshift( $same_as, $user->user_url );
 		}
@@ -150,8 +153,8 @@ class Schema_Author_Profile {
 			'name'        => $user->display_name,
 			'url'         => get_author_posts_url( $user_id ),
 			'description' => wp_strip_all_tags( (string) $user->description ),
-			'jobTitle'    => (string) get_user_meta( $user_id, self::META_JOB_TITLE, true ),
-			'image'       => (string) get_user_meta( $user_id, self::META_PHOTO, true ),
+			'jobTitle'    => $team ? (string) get_user_meta( $user_id, self::META_JOB_TITLE, true ) : '',
+			'image'       => $team ? (string) get_user_meta( $user_id, self::META_PHOTO, true ) : '',
 			'sameAs'      => array_values( array_unique( $same_as ) ),
 		);
 

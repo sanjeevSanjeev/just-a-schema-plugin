@@ -1,11 +1,10 @@
-import { createRoot, useEffect, useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Button, Notice, Spinner, ToggleControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import EntityForm from '../shared/EntityForm';
 import LivePreview from '../shared/LivePreview';
 import { getEntity, saveEntity } from '../shared/api';
 import { getWizardCopy } from '../shared/wizardCopy';
-import '../shared/style.scss';
 
 const bootstrap = window.SchemaPluginData || {};
 
@@ -16,7 +15,7 @@ const bootstrap = window.SchemaPluginData || {};
  * separate implementation of this form." Two-column layout with a sticky
  * live preview at >=1200px (Section 10.8.B).
  */
-function EntitySettingsPage() {
+export default function EntityTab() {
 	const [ value, setValue ] = useState( null );
 	const [ saving, setSaving ] = useState( false );
 	const [ saved, setSaved ] = useState( false );
@@ -48,11 +47,8 @@ function EntitySettingsPage() {
 	const copy = getWizardCopy( value.entity_type );
 
 	return (
-		<div className="schema-entity-settings schema-page schema-page-wide schema-card">
-			<p className="schema-breadcrumb">
-				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
-			</p>
-			<h1>{ value.entity_type ? copy.details_heading : __( 'Schema: Entity', 'schema-plugin' ) }</h1>
+		<div className="schema-entity-settings schema-settings-tab">
+			<h2>{ value.entity_type ? copy.details_heading : __( 'Site entity', 'schema-plugin' ) }</h2>
 			<p className="schema-wizard-step-intro">
 				{ __( 'This shows up in your structured data across the whole site.', 'schema-plugin' ) }{ ' ' }
 				<a href={ bootstrap.wizardUrl }>{ __( 'Re-run setup wizard', 'schema-plugin' ) }</a>
@@ -90,9 +86,4 @@ function EntitySettingsPage() {
 			</div>
 		</div>
 	);
-}
-
-const container = document.getElementById( 'schema-plugin-entity-root' );
-if ( container ) {
-	createRoot( container ).render( <EntitySettingsPage /> );
 }

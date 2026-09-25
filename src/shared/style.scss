@@ -871,3 +871,29 @@ fieldset.schema-field legend {
 		max-width: none;
 	}
 }
+
+/* -- Dashboard head, Features, tabs (menu restructure) --------------------- */
+
+.schema-dashboard-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--schema-space-3);
+	flex-wrap: wrap;
+}
+
+.schema-features-card {
+	margin-top: var(--schema-space-5);
+
+	.schema-feature-row {
+		margin-bottom: var(--schema-space-2);
+	}
+}
+
+.schema-tabs .components-tab-panel__tab-content {
+	padding-top: var(--schema-space-4);
+}
+
+.schema-settings-tab > h2:first-child {
+	margin-top: 0;
+}

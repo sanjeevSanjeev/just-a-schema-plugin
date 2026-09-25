@@ -1,5 +1,6 @@
 import { registerPlugin } from '@wordpress/plugins';
-import { PluginSidebar, PluginSidebarMoreMenuItem } from '@wordpress/edit-post';
+import * as editPost from '@wordpress/edit-post';
+import * as editor from '@wordpress/editor';
 import { PanelBody, Button, Spinner } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
@@ -7,6 +8,12 @@ import { __ } from '@wordpress/i18n';
 import PostBlockForm from '../shared/PostBlockForm';
 import { getPostSchema, savePostSchema, deletePostSchema } from '../shared/api';
 import '../shared/style.scss';
+
+// WP 6.6 moved these to @wordpress/editor and deprecated the edit-post
+// versions; the plugin still supports 6.5, so prefer the new home and
+// fall back (the old one is only touched on 6.5, so no warning on 6.6+).
+const PluginSidebar = editor.PluginSidebar || editPost.PluginSidebar;
+const PluginSidebarMoreMenuItem = editor.PluginSidebarMoreMenuItem || editPost.PluginSidebarMoreMenuItem;
 
 const SIDEBAR_NAME = 'schema-plugin-sidebar';
 const SIDEBAR_ICON = 'editor-code';

@@ -58,6 +58,10 @@ class Schema_Network_Identity {
 		if ( null !== self::$preview_settings ) {
 			return self::$preview_settings;
 		}
+		// Feature off: behave as standalone, without reading the option.
+		if ( ! Schema_Features::is_enabled( 'network' ) ) {
+			return self::defaults();
+		}
 		$saved = get_option( self::OPTION, array() );
 		return array_merge( self::defaults(), is_array( $saved ) ? $saved : array() );
 	}

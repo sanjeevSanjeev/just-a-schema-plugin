@@ -73,16 +73,31 @@ class Schema_Linked_Entity_Rest_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function get_config( WP_REST_Request $request ) {
-		$config = Schema_Linked_Entity_Types::get_config( sanitize_key( $request['type'] ) );
+		$config = self::enabled_config( sanitize_key( $request['type'] ) );
 		if ( ! $config ) {
 			return self::unknown_type_error();
 		}
 		return new WP_REST_Response( $config );
 	}
 
-	public static function list_entities( WP_REST_Request $request ): WP_REST_Response {
+	/**
+	 * Config for a type whose feature is on; null otherwise, so a
+	 * disabled feature's routes answer 404.
+	 */
+	private static function enabled_config( string $type ): ?array {
+		return isset( Schema_Linked_Entity_Types::get_enabled_registry()[ $type ] ) ? Schema_Linked_Entity_Types::get_config( $type ) : null;
+	}
+
+	/**
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function list_entities( WP_REST_Request $request ) {
+		$type = sanitize_key( $request['type'] );
+		if ( ! self::enabled_config( $type ) ) {
+			return self::unknown_type_error();
+		}
 		return new WP_REST_Response(
-			array( 'entities' => Schema_Linked_Entity_Store::get_all( sanitize_key( $request['type'] ) ) )
+			array( 'entities' => Schema_Linked_Entity_Store::get_all( $type ) )
 		);
 	}
 
@@ -91,7 +106,7 @@ class Schema_Linked_Entity_Rest_Controller {
 	 */
 	public static function create_entity( WP_REST_Request $request ) {
 		$type = sanitize_key( $request['type'] );
-		if ( ! Schema_Linked_Entity_Types::get_config( $type ) ) {
+		if ( ! self::enabled_config( $type ) ) {
 			return self::unknown_type_error();
 		}
 
@@ -109,7 +124,7 @@ class Schema_Linked_Entity_Rest_Controller {
 		$type = sanitize_key( $request['type'] );
 		$id   = sanitize_key( $request['id'] );
 
-		if ( ! Schema_Linked_Entity_Types::get_config( $type ) ) {
+		if ( ! self::enabled_config( $type ) ) {
 			return self::unknown_type_error();
 		}
 		if ( ! Schema_Linked_Entity_Store::get( $type, $id ) ) {
@@ -123,7 +138,13 @@ class Schema_Linked_Entity_Rest_Controller {
 		return is_wp_error( $record ) ? $record : new WP_REST_Response( $record );
 	}
 
-	public static function delete_entity( WP_REST_Request $request ): WP_REST_Response {
+	/**
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function delete_entity( WP_REST_Request $request ) {
+		if ( ! self::enabled_config( sanitize_key( $request['type'] ) ) ) {
+			return self::unknown_type_error();
+		}
 		Schema_Linked_Entity_Store::delete( sanitize_key( $request['type'] ), sanitize_key( $request['id'] ) );
 		return new WP_REST_Response( array( 'deleted' => true ) );
 	}

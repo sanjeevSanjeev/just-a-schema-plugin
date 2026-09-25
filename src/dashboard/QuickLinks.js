@@ -5,11 +5,10 @@ const bootstrap = window.SchemaPluginData || {};
 /** Plain navigation links to the other admin pages -- not client-side routes. */
 export default function QuickLinks() {
 	const links = [
-		{ href: bootstrap.entitySettingsUrl, label: __( 'Entity Settings', 'schema-plugin' ) },
-		{ href: bootstrap.defaultRulesUrl, label: __( 'Default Rules', 'schema-plugin' ) },
+		{ href: bootstrap.entitySettingsUrl, label: __( 'Site entity', 'schema-plugin' ) },
+		{ href: bootstrap.defaultRulesUrl, label: __( 'Default rules', 'schema-plugin' ) },
 		{ href: bootstrap.exclusionsUrl, label: __( 'Exclusions', 'schema-plugin' ) },
-		{ href: bootstrap.networkIdentityUrl, label: __( 'Network Identity', 'schema-plugin' ) },
-		{ href: bootstrap.wizardUrl, label: __( 'Re-run Setup Wizard', 'schema-plugin' ) },
+		...( bootstrap.contentUrl ? [ { href: bootstrap.contentUrl, label: __( 'Content', 'schema-plugin' ) } ] : [] ),
 	];
 
 	return (

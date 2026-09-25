@@ -3,6 +3,8 @@ import { Spinner } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import { getCompleteness } from '../shared/api';
 
+const bootstrap = window.SchemaPluginData || {};
+
 /**
  * v1.1 Phase 6 -- Completeness. Scores come from PHP
  * (Schema_Completeness), computed on the emitted nodes; this component
@@ -153,7 +155,9 @@ export default function Completeness() {
 
 			{ 0 === populated.length && (
 				<p className="description">
-					{ __( 'Add services, team members, locations or events and they will be scored here too.', 'schema-plugin' ) }
+					{ bootstrap.contentUrl
+						? __( 'Entries you add under Content are scored here too.', 'schema-plugin' )
+						: __( 'Turn on Services, Team, Locations or Events under Features and their entries are scored here too.', 'schema-plugin' ) }
 				</p>
 			) }
 		</section>

@@ -1,5 +1,5 @@
 import { createRoot, useEffect, useState } from '@wordpress/element';
-import { Button, Notice, RadioControl, SelectControl, Spinner } from '@wordpress/components';
+import { Button, Notice, RadioControl, SelectControl, Spinner, TabPanel } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import TypedField from '../shared/fields/TypedField';
 import PagePicker from '../shared/fields/PagePicker';
@@ -26,12 +26,9 @@ function emptyEntity( config ) {
 }
 
 /**
- * v1.1 Phase 1 -- ONE generic manager screen for every repeatable,
- * page-linkable entity type (Services now; Locations/Events/Team follow
- * in Phase 2/3 as additional Schema_Linked_Entity_Types config entries,
- * each mounted on their own admin page passing a different entityType
- * via the root element's data-entity-type attribute -- not four separate
- * bundles).
+ * ONE generic manager for every repeatable, page-linkable entity type
+ * (Services, Team, Locations, Events), shown as a tab per enabled
+ * feature on the Content page.
  *
  * A type whose link_modes include 'auto' (Team) can instead be bound to a
  * WP user: it then appears on every post that user authors.
@@ -101,11 +98,7 @@ function LinkedEntityManager( { entityType } ) {
 	};
 
 	return (
-		<div className="schema-linked-entity-manager schema-page schema-page-wide schema-card">
-			<p className="schema-breadcrumb">
-				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
-			</p>
-			<h1>{ config.label }</h1>
+		<div className="schema-linked-entity-manager">
 
 			{ ! editing && (
 				<>
@@ -235,7 +228,50 @@ function LinkedEntityManager( { entityType } ) {
 	);
 }
 
+const contentTypes = bootstrap.contentTypes || [];
+
+function initialTab() {
+	const tab = new URLSearchParams( window.location.search ).get( 'tab' );
+	return contentTypes.some( ( t ) => t.key === tab ) ? tab : contentTypes[ 0 ]?.key;
+}
+
+function rememberTab( name ) {
+	const url = new URL( window.location.href );
+	url.searchParams.set( 'tab', name );
+	window.history.replaceState( null, '', url );
+}
+
+/**
+ * Content page: one tab per enabled content feature (Schema_Features).
+ * With a single feature on, no tab bar is shown.
+ */
+function ContentPage() {
+	return (
+		<div className="schema-content-page schema-page schema-page-wide schema-card">
+			<p className="schema-breadcrumb">
+				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
+			</p>
+			<h1>{ __( 'Content', 'schema-plugin' ) }</h1>
+			{ 1 === contentTypes.length ? (
+				<>
+					<h2>{ contentTypes[ 0 ].label }</h2>
+					<LinkedEntityManager entityType={ contentTypes[ 0 ].key } />
+				</>
+			) : (
+				<TabPanel
+					className="schema-tabs"
+					tabs={ contentTypes.map( ( t ) => ( { name: t.key, title: t.label } ) ) }
+					initialTabName={ initialTab() }
+					onSelect={ rememberTab }
+				>
+					{ ( tab ) => <LinkedEntityManager key={ tab.name } entityType={ tab.name } /> }
+				</TabPanel>
+			) }
+		</div>
+	);
+}
+
 const container = document.getElementById( 'schema-plugin-linked-entity-root' );
-if ( container ) {
-	createRoot( container ).render( <LinkedEntityManager entityType={ container.dataset.entityType } /> );
+if ( container && contentTypes.length ) {
+	createRoot( container ).render( <ContentPage /> );
 }

@@ -1,10 +1,13 @@
 import { createRoot, useEffect, useState } from '@wordpress/element';
-import { Spinner } from '@wordpress/components';
+import { Button, Spinner } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import StatusSummary from './StatusSummary';
 import RecommendationCard from './RecommendationCard';
 import QuickLinks from './QuickLinks';
 import Completeness from './Completeness';
+import FeaturesCard from './FeaturesCard';
+
+const bootstrap = window.SchemaPluginData || {};
 import { getDashboardStatus } from '../shared/api';
 import '../shared/style.scss';
 
@@ -12,9 +15,9 @@ import '../shared/style.scss';
  * The persistent Admin Dashboard -- supersedes the old one-time
  * post-wizard landing screen; its "what's live" content now lives here
  * permanently and reflects live, current state rather than a snapshot
- * from the moment the wizard finished. Plain counts, a small set of
- * dismissable/completable next steps, and (v1.1 Phase 6) the
- * Completeness section with per-entity scores.
+ * from the moment the wizard finished. The plugin's home: plain counts,
+ * next steps, Completeness scores, optional Features, and the entry point
+ * for re-running the setup wizard (which has no menu item of its own).
  */
 function DashboardApp() {
 	const [ status, setStatus ] = useState( null );
@@ -42,7 +45,14 @@ function DashboardApp() {
 
 	return (
 		<div className="schema-dashboard schema-page schema-page-wide schema-card">
-			<h1>{ __( 'Schema Dashboard', 'schema-plugin' ) }</h1>
+			<div className="schema-dashboard-head">
+				<h1>{ __( 'Schema Dashboard', 'schema-plugin' ) }</h1>
+				<Button variant="secondary" href={ bootstrap.wizardUrl }>
+					{ status.entity_configured
+						? __( 'Re-run setup wizard', 'schema-plugin' )
+						: __( 'Run setup wizard', 'schema-plugin' ) }
+				</Button>
+			</div>
 			<p className="schema-wizard-step-intro">
 				{ sprintf(
 					/* translators: %s: site type label, e.g. "Local or Small Business". */
@@ -83,6 +93,8 @@ function DashboardApp() {
 					</ul>
 				</details>
 			) }
+
+			<FeaturesCard />
 
 			<QuickLinks />
 		</div>

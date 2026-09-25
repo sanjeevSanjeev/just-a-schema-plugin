@@ -1,12 +1,9 @@
-import { createRoot, useEffect, useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Button, Notice, Panel, PanelBody, RadioControl, Spinner, TextControl } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import UrlField from '../shared/fields/UrlField';
 import LivePreview from '../shared/LivePreview';
 import { getNetworkIdentity, saveNetworkIdentity } from '../shared/api';
-import '../shared/style.scss';
-
-const bootstrap = window.SchemaPluginData || {};
 
 /**
  * v1.1 Phase 4 -- Network Identity settings (CLAUDE.md complaint #1).
@@ -14,7 +11,7 @@ const bootstrap = window.SchemaPluginData || {};
  * posts the draft settings to /preview and shows the sitewide nodes
  * exactly as wp_head would render them.
  */
-function NetworkIdentityPage() {
+export default function NetworkTab() {
 	const [ data, setData ] = useState( null );
 	const [ settings, setSettings ] = useState( null );
 	const [ saving, setSaving ] = useState( false );
@@ -56,11 +53,8 @@ function NetworkIdentityPage() {
 	const suggestion = data.suggested_parent_url;
 
 	return (
-		<div className="schema-network-page schema-page schema-page-wide schema-card">
-			<p className="schema-breadcrumb">
-				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
-			</p>
-			<h1>{ __( 'Network Identity', 'schema-plugin' ) }</h1>
+		<div className="schema-network-page schema-settings-tab">
+			<h2>{ __( 'Network Identity', 'schema-plugin' ) }</h2>
 			<p className="schema-wizard-step-intro">
 				{ __(
 					'If this site is a subdomain, subdirectory or separate install belonging to a bigger brand (e.g. blog.example.com or example.com/shop), link it to the main site so search engines see one connected identity instead of unrelated duplicates.',
@@ -204,9 +198,4 @@ function NetworkIdentityPage() {
 			) }
 		</div>
 	);
-}
-
-const container = document.getElementById( 'schema-plugin-network-root' );
-if ( container ) {
-	createRoot( container ).render( <NetworkIdentityPage /> );
 }

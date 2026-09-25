@@ -1,15 +1,16 @@
 import { useState } from '@wordpress/element';
-import { Button, Panel, PanelBody } from '@wordpress/components';
+import { Button, CheckboxControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { saveEntity } from '../shared/api';
+import { saveEntity, saveFeatures } from '../shared/api';
 import { getWizardCopy } from '../shared/wizardCopy';
 
 const bootstrap = window.SchemaPluginData || {};
 
 /**
- * Wizard Step 4 -- review + finish, with a de-emphasized, collapsed
- * "Advanced: Network Identity" entry point linking to its settings page
- * (v1.1 Phase 4; non-blocking, not part of the wizard flow). On finish, always returns to the
+ * Wizard Step 4 -- review + finish, plus the optional features checklist:
+ * on a first run the suggestions for the chosen type are pre-ticked (opt
+ * out); on a re-run it starts from what's currently enabled, so re-running
+ * never switches anything off by itself. On finish, always returns to the
  * persistent Dashboard now (it absorbed the old one-time landing
  * screen's content, so first-run vs. re-run no longer need different
  * destinations). Heading personalizes to the chosen type ("Your business
@@ -19,12 +20,20 @@ export default function Step4Review( { entity, onBack } ) {
 	const [ saving, setSaving ] = useState( false );
 	const typeLabel = bootstrap.lockedTypes?.[ entity.entity_type ]?.label || entity.entity_type;
 	const copy = getWizardCopy( entity.entity_type );
+	const features = bootstrap.features || [];
+	const suggested = bootstrap.featureSuggestions?.[ entity.entity_type ] || [];
+	const [ enabled, setEnabled ] = useState( () =>
+		bootstrap.wizardCompletedAt ? features.filter( ( f ) => f.enabled ).map( ( f ) => f.key ) : suggested
+	);
+	const toggle = ( key, on ) => setEnabled( on ? [ ...enabled, key ] : enabled.filter( ( k ) => k !== key ) );
 
 	const finish = () => {
 		setSaving( true );
-		saveEntity( { ...entity, complete_wizard: true } ).then( () => {
-			window.location.href = bootstrap.dashboardUrl;
-		} );
+		saveEntity( { ...entity, complete_wizard: true } )
+			.then( () => saveFeatures( enabled ) )
+			.then( () => {
+				window.location.href = bootstrap.dashboardUrl;
+			} );
 	};
 
 	return (
@@ -51,19 +60,35 @@ export default function Step4Review( { entity, onBack } ) {
 				) }
 			</div>
 
-			<Panel>
-				<PanelBody title={ __( 'Advanced: Network Identity', 'schema-plugin' ) } initialOpen={ false }>
-					<p>
-						{ __(
-							"Is this site a subdomain, subdirectory or separate install of a bigger brand? After finishing, you can link it to the main site's identity. Optional; most sites don't need it.",
-							'schema-plugin'
-						) }
-					</p>
-					<p>
-						<a href={ bootstrap.networkIdentityUrl }>{ __( 'Network Identity settings', 'schema-plugin' ) }</a>
-					</p>
-				</PanelBody>
-			</Panel>
+			<fieldset className="schema-field-group schema-wizard-features">
+				<legend>
+					<h2>{ __( 'Optional features', 'schema-plugin' ) }</h2>
+				</legend>
+				<p className="description">
+					{ __(
+						"Only what you tick is added. Suggestions for your site type are pre-selected; untick anything you don't need. You can change this later on the Dashboard.",
+						'schema-plugin'
+					) }
+				</p>
+				{ features.map( ( feature ) => (
+					<CheckboxControl
+						key={ feature.key }
+						label={
+							suggested.includes( feature.key ) ? (
+								<span className="schema-field-label-wrap">
+									{ feature.label }
+									<span className="schema-recommended-mark">{ __( 'Suggested', 'schema-plugin' ) }</span>
+								</span>
+							) : (
+								feature.label
+							)
+						}
+						help={ feature.description }
+						checked={ enabled.includes( feature.key ) }
+						onChange={ ( on ) => toggle( feature.key, on ) }
+					/>
+				) ) }
+			</fieldset>
 
 			<div className="schema-wizard-nav">
 				<Button variant="secondary" onClick={ onBack } disabled={ saving }>
