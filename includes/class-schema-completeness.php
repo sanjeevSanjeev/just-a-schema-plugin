@@ -13,6 +13,11 @@
  * Identity and auto-linked profile data included), not the raw form
  * input, so the score describes what search engines actually receive.
  *
+ * Each issue is { text, severity }: 'error' when it stops Google using
+ * the entry (invalid URL, event with no venue, not set up), 'warning' when
+ * it's worth a look (appears nowhere, past event, incomplete policy). The
+ * Dashboard colors alerts by it.
+ *
  * Score = (2 x required filled + recommended filled) /
  *         (2 x required total  + recommended total), as a percentage.
  * It's this plugin's heuristic, not a Google metric; Google has no
@@ -85,7 +90,7 @@ class Schema_Completeness {
 				'score'               => 0,
 				'missing_required'    => array(),
 				'missing_recommended' => array(),
-				'issues'              => array( __( 'Not set up yet. Run the setup wizard to choose a site type.', 'schema-plugin' ) ),
+				'issues'              => array( self::issue( __( 'Not set up yet. Run the setup wizard to choose a site type.', 'schema-plugin' ), 'error' ) ),
 				'edit_url'            => $edit_url,
 			);
 		}
@@ -119,9 +124,12 @@ class Schema_Completeness {
 		$issues = self::field_issues( $node, $defs );
 
 		if ( Schema_Entity_Resolver::is_unlinked( $entity ) ) {
-			$issues[] = 'auto' === $entity->link_mode
-				? __( "Not appearing anywhere yet: the linked user hasn't published any posts.", 'schema-plugin' )
-				: __( 'Not appearing anywhere: choose the page it belongs to.', 'schema-plugin' );
+			$issues[] = self::issue(
+				'auto' === $entity->link_mode
+					? __( "Not appearing anywhere yet: the linked user hasn't published any posts.", 'schema-plugin' )
+					: __( 'Not appearing anywhere: choose the page it belongs to.', 'schema-plugin' ),
+				'warning'
+			);
 		}
 
 		if ( 'event' === $entity_type ) {
@@ -174,7 +182,7 @@ class Schema_Completeness {
 	 * Problems with values that are present: invalid URLs and incomplete
 	 * store policies (the same checks the live preview lint runs).
 	 *
-	 * @return string[]
+	 * @return array[] Issues ({ text, severity }).
 	 */
 	private static function field_issues( array $node, array $defs ): array {
 		$issues = array();
@@ -185,13 +193,18 @@ class Schema_Completeness {
 			}
 			$type = $def['type'] ?? 'text';
 			if ( in_array( $type, array( 'url', 'media' ), true ) && is_string( $value ) && ! filter_var( $value, FILTER_VALIDATE_URL ) ) {
-				$issues[] = sprintf(
-					/* translators: %s: field label. */
-					__( "%s doesn't look like a valid URL.", 'schema-plugin' ),
-					self::label( $key, $def )
+				$issues[] = self::issue(
+					sprintf(
+						/* translators: %s: field label. */
+						__( "%s doesn't look like a valid URL.", 'schema-plugin' ),
+						self::label( $key, $def )
+					),
+					'error'
 				);
 			}
-			$issues = array_merge( $issues, Schema_Sanitizer::lint_commerce_value( $value, $type ) );
+			foreach ( Schema_Sanitizer::lint_commerce_value( $value, $type ) as $text ) {
+				$issues[] = self::issue( $text, 'warning' );
+			}
 		}
 		return $issues;
 	}
@@ -201,7 +214,7 @@ class Schema_Completeness {
 	 * with an address; purely virtual events aren't supported. Past events
 	 * still emit but are no longer useful.
 	 *
-	 * @return string[]
+	 * @return array[] Issues ({ text, severity }).
 	 */
 	private static function event_issues( array $node ): array {
 		$issues    = array();
@@ -213,18 +226,28 @@ class Schema_Completeness {
 			}
 		}
 		if ( $locations && ! $has_venue ) {
-			$issues[] = __( "Google's event results need a physical venue with an address. Online-only events aren't eligible.", 'schema-plugin' );
+			$issues[] = self::issue( __( "Google's event results need a physical venue with an address. Online-only events aren't eligible.", 'schema-plugin' ), 'error' );
 		}
 
 		$last = $node['endDate'] ?? ( $node['startDate'] ?? '' );
 		if ( is_string( $last ) && '' !== $last ) {
 			$timestamp = strtotime( $last );
 			if ( $timestamp && $timestamp < time() ) {
-				$issues[] = __( 'This event is in the past. Consider removing it or updating the dates.', 'schema-plugin' );
+				$issues[] = self::issue( __( 'This event is in the past. Consider removing it or updating the dates.', 'schema-plugin' ), 'warning' );
 			}
 		}
 
 		return $issues;
+	}
+
+	/**
+	 * @return array{text:string, severity:string}
+	 */
+	private static function issue( string $text, string $severity ): array {
+		return array(
+			'text'     => $text,
+			'severity' => $severity,
+		);
 	}
 
 	/**

@@ -8,10 +8,10 @@
  * activation redirect, and the bootstrap data handed to React.
  *
  * Menu, kept deliberately small:
- *   Schema
- *   ├─ Dashboard  home: status, completeness, features, re-run wizard
- *   ├─ Settings   tabs: Site entity · Default rules · Exclusions
- *   │             (+ Network identity when that feature is on)
+ *   Schema        opens the Dashboard (health, issues, next step);
+ *   │             no separate "Dashboard" row
+ *   ├─ Settings   tabs: Site entity · Default rules · Exclusions ·
+ *   │             Features (+ Network identity when that feature is on)
  *   └─ Content    only when a content feature is on; one tab per feature
  * The wizard has no menu entry (reached from the Dashboard and the
  * first-run redirect). Pre-restructure page slugs redirect to their new
@@ -51,6 +51,7 @@ class Schema_Admin {
 	public static function init(): void {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menus' ) );
 		add_action( 'admin_head', array( __CLASS__, 'hide_wizard_menu_item' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'hide_dashboard_menu_row' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
 		add_action( 'enqueue_block_editor_assets', array( __CLASS__, 'enqueue_editor_assets' ) );
 		add_action( 'admin_init', array( __CLASS__, 'maybe_redirect_after_activation' ) );
@@ -133,16 +134,26 @@ class Schema_Admin {
 	}
 
 	/**
-	 * An old link to a feature that's now off goes to the Dashboard's
-	 * Features card (where it can be turned on) rather than a page that
-	 * no longer exists.
+	 * An old link to a feature that's now off goes to Settings → Features
+	 * (where it can be turned on) rather than a page that no longer exists.
 	 */
 	private static function legacy_target_url( string $page, string $tab ): string {
 		$feature = self::PAGE_CONTENT === $page ? $tab : ( 'network' === $tab ? 'network' : '' );
 		if ( $feature && ! Schema_Features::is_enabled( $feature ) ) {
-			return self::page_url( self::PAGE_DASHBOARD ) . '#schema-features-heading';
+			return self::page_url( self::PAGE_SETTINGS, 'features' );
 		}
 		return self::page_url( $page, $tab );
+	}
+
+	/**
+	 * Clicking "Schema" already opens the Dashboard, so its own submenu row
+	 * is redundant. It stays registered (WordPress points the top-level
+	 * link at the first submenu item, so removing it would make "Schema"
+	 * open Settings) and is only hidden visually. Runs on every admin
+	 * screen because the menu is on every screen; it's one CSS rule.
+	 */
+	public static function hide_dashboard_menu_row(): void {
+		wp_add_inline_style( 'admin-menu', '#toplevel_page_' . self::PAGE_DASHBOARD . ' .wp-submenu .wp-first-item{display:none}' );
 	}
 
 	public static function hide_wizard_menu_item(): void {
@@ -283,6 +294,7 @@ class Schema_Admin {
 			'defaultRulesUrl'        => self::page_url( self::PAGE_SETTINGS, 'rules' ),
 			'exclusionsUrl'          => self::page_url( self::PAGE_SETTINGS, 'exclusions' ),
 			'networkIdentityUrl'     => self::page_url( self::PAGE_SETTINGS, 'network' ),
+			'featuresUrl'            => self::page_url( self::PAGE_SETTINGS, 'features' ),
 			'wizardUrl'              => self::page_url( self::PAGE_WIZARD ),
 			'features'               => Schema_Features::get_status(),
 			'featureSuggestions'     => array_combine(

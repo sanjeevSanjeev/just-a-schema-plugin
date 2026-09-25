@@ -15,27 +15,30 @@ export function AddressField( { value = {}, onChange, required = false } ) {
 	return (
 		<fieldset className="schema-field schema-field-address">
 			<legend>{ label }</legend>
-			<TextControl
-				label={ __( 'Street address', 'schema-plugin' ) }
-				value={ value.streetAddress || '' }
-				onChange={ ( v ) => set( 'streetAddress', v ) }
-			/>
-			<TextControl
-				label={ __( 'City', 'schema-plugin' ) }
-				value={ value.addressLocality || '' }
-				onChange={ ( v ) => set( 'addressLocality', v ) }
-			/>
-			<TextControl
-				label={ __( 'State / region', 'schema-plugin' ) }
-				value={ value.addressRegion || '' }
-				onChange={ ( v ) => set( 'addressRegion', v ) }
-			/>
-			<TextControl
-				label={ __( 'Postal code', 'schema-plugin' ) }
-				value={ value.postalCode || '' }
-				onChange={ ( v ) => set( 'postalCode', v ) }
-			/>
-			<CountrySelect value={ value.addressCountry } onChange={ ( v ) => set( 'addressCountry', v ) } />
+			{ /* Grid: street full width, the rest two per row on wide screens. */ }
+			<div className="schema-address-grid">
+				<TextControl
+					label={ __( 'Street address', 'schema-plugin' ) }
+					value={ value.streetAddress || '' }
+					onChange={ ( v ) => set( 'streetAddress', v ) }
+				/>
+				<TextControl
+					label={ __( 'City', 'schema-plugin' ) }
+					value={ value.addressLocality || '' }
+					onChange={ ( v ) => set( 'addressLocality', v ) }
+				/>
+				<TextControl
+					label={ __( 'State / region', 'schema-plugin' ) }
+					value={ value.addressRegion || '' }
+					onChange={ ( v ) => set( 'addressRegion', v ) }
+				/>
+				<TextControl
+					label={ __( 'Postal code', 'schema-plugin' ) }
+					value={ value.postalCode || '' }
+					onChange={ ( v ) => set( 'postalCode', v ) }
+				/>
+				<CountrySelect value={ value.addressCountry } onChange={ ( v ) => set( 'addressCountry', v ) } />
+			</div>
 		</fieldset>
 	);
 }

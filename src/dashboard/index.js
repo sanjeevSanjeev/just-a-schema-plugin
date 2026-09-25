@@ -1,36 +1,77 @@
 import { createRoot, useEffect, useState } from '@wordpress/element';
-import { Button, Spinner } from '@wordpress/components';
-import { __, sprintf } from '@wordpress/i18n';
-import StatusSummary from './StatusSummary';
-import RecommendationCard from './RecommendationCard';
-import QuickLinks from './QuickLinks';
-import Completeness from './Completeness';
-import FeaturesCard from './FeaturesCard';
-
-const bootstrap = window.SchemaPluginData || {};
-import { getDashboardStatus } from '../shared/api';
+import { Button, Card, CardBody, Notice, Spinner } from '@wordpress/components';
+import { __ } from '@wordpress/i18n';
+import Tiles from './Tiles';
+import AttentionPanel from './AttentionPanel';
+import NextStep from './NextStep';
+import HealthDetails from './HealthDetails';
+import { alertsFrom } from './entries';
+import { getDashboardStatus, getCompleteness } from '../shared/api';
 import '../shared/style.scss';
 
+const bootstrap = window.SchemaPluginData || {};
+
 /**
- * The persistent Admin Dashboard -- supersedes the old one-time
- * post-wizard landing screen; its "what's live" content now lives here
- * permanently and reflects live, current state rather than a snapshot
- * from the moment the wizard finished. The plugin's home: plain counts,
- * next steps, Completeness scores, optional Features, and the entry point
- * for re-running the setup wizard (which has no menu item of its own).
+ * The plugin's home (the "Schema" menu opens it), sized to fit one screen:
+ * header (site type + "Change type"), three summary tiles (Health,
+ * Issues, Live), then "Needs attention" beside a single "Next step".
+ * Per-entry health details are collapsed below the fold.
+ *
+ * The only primary-styled action is "Run setup wizard", and only while the
+ * site isn't set up. Otherwise the wizard is a quiet "Change type" link
+ * next to what it changes, and fixing issues is the main path.
  */
 function DashboardApp() {
 	const [ status, setStatus ] = useState( null );
+	const [ report, setReport ] = useState( null );
+	const [ failed, setFailed ] = useState( false );
 
 	useEffect( () => {
-		getDashboardStatus().then( setStatus );
+		Promise.all( [ getDashboardStatus(), getCompleteness() ] )
+			.then( ( [ statusRes, reportRes ] ) => {
+				setStatus( statusRes );
+				setReport( reportRes );
+			} )
+			.catch( () => setFailed( true ) );
 	}, [] );
 
-	if ( ! status ) {
+	if ( failed ) {
+		return (
+			<Notice status="error" isDismissible={ false }>
+				{ __( 'The dashboard could not be loaded. Reload the page to try again.', 'schema-plugin' ) }
+			</Notice>
+		);
+	}
+	if ( ! status || ! report ) {
 		return <Spinner />;
 	}
 
-	const setLocalStatus = ( key, newStatus ) => {
+	if ( ! status.entity_configured ) {
+		return (
+			<div className="schema-dashboard">
+				<header className="schema-dashboard-head">
+					<h1>{ __( 'Schema', 'schema-plugin' ) }</h1>
+				</header>
+				<Card className="schema-dashboard-welcome">
+					<CardBody>
+						<h2>{ __( "Let's set up your structured data", 'schema-plugin' ) }</h2>
+						<p>
+							{ __(
+								'Tell us what kind of site this is and we will set sensible defaults for every page. It takes about two minutes, and you can change anything later.',
+								'schema-plugin'
+							) }
+						</p>
+						<Button variant="primary" href={ bootstrap.wizardUrl }>
+							{ __( 'Run setup wizard', 'schema-plugin' ) }
+						</Button>
+					</CardBody>
+				</Card>
+			</div>
+		);
+	}
+
+	const alerts = alertsFrom( report );
+	const setRecommendationStatus = ( key, newStatus ) => {
 		setStatus( ( prev ) => ( {
 			...prev,
 			recommendations: prev.recommendations.map( ( rec ) =>
@@ -39,64 +80,25 @@ function DashboardApp() {
 		} ) );
 	};
 
-	const pending = status.recommendations.filter( ( rec ) => 'pending' === rec.status );
-	const completed = status.recommendations.filter( ( rec ) => 'completed' === rec.status );
-	const dismissed = status.recommendations.filter( ( rec ) => 'dismissed' === rec.status );
-
 	return (
-		<div className="schema-dashboard schema-page schema-page-wide schema-card">
-			<div className="schema-dashboard-head">
-				<h1>{ __( 'Schema Dashboard', 'schema-plugin' ) }</h1>
-				<Button variant="secondary" href={ bootstrap.wizardUrl }>
-					{ status.entity_configured
-						? __( 'Re-run setup wizard', 'schema-plugin' )
-						: __( 'Run setup wizard', 'schema-plugin' ) }
-				</Button>
+		<div className="schema-dashboard">
+			<header className="schema-dashboard-head">
+				<h1>{ __( 'Schema', 'schema-plugin' ) }</h1>
+				<span className="schema-dashboard-type">{ status.site_type_label }</span>
+				<a className="schema-dashboard-change-type" href={ bootstrap.wizardUrl }>
+					{ __( 'Change type', 'schema-plugin' ) }
+					<span className="screen-reader-text">{ __( '(re-runs the setup wizard)', 'schema-plugin' ) }</span>
+				</a>
+			</header>
+
+			<Tiles report={ report } status={ status } alerts={ alerts } />
+
+			<div className="schema-dashboard-panels">
+				<AttentionPanel alerts={ alerts } />
+				<NextStep recommendations={ status.recommendations } onStatusChange={ setRecommendationStatus } />
 			</div>
-			<p className="schema-wizard-step-intro">
-				{ sprintf(
-					/* translators: %s: site type label, e.g. "Local or Small Business". */
-					__( 'Type: %s', 'schema-plugin' ),
-					status.entity_configured ? status.site_type_label : __( 'Not set up yet', 'schema-plugin' )
-				) }
-			</p>
 
-			<StatusSummary status={ status } />
-
-			<Completeness />
-
-			{ ( pending.length > 0 || completed.length > 0 ) && (
-				<div className="schema-dashboard-recommendations">
-					<h2>{ __( 'Recommended next steps', 'schema-plugin' ) }</h2>
-					{ pending.map( ( rec ) => (
-						<RecommendationCard key={ rec.key } recommendation={ rec } onStatusChange={ setLocalStatus } />
-					) ) }
-					{ completed.map( ( rec ) => (
-						<RecommendationCard key={ rec.key } recommendation={ rec } onStatusChange={ setLocalStatus } />
-					) ) }
-				</div>
-			) }
-
-			{ dismissed.length > 0 && (
-				<details className="schema-dashboard-dismissed">
-					<summary>
-						{ sprintf(
-							/* translators: %d: number of dismissed suggestions. */
-							__( 'Dismissed suggestions (%d)', 'schema-plugin' ),
-							dismissed.length
-						) }
-					</summary>
-					<ul>
-						{ dismissed.map( ( rec ) => (
-							<li key={ rec.key }>{ rec.label }</li>
-						) ) }
-					</ul>
-				</details>
-			) }
-
-			<FeaturesCard />
-
-			<QuickLinks />
+			<HealthDetails report={ report } />
 		</div>
 	);
 }

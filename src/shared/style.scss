@@ -21,6 +21,12 @@
 	--schema-color-blue: #2271b1;
 	--schema-color-white: #646970;
 	--schema-color-error: #cc1818;
+	// Status colors (wp-admin notice palette); always paired with text.
+	--schema-status-error: #d63638;
+	--schema-status-error-bg: #fcf0f1;
+	--schema-status-warning: #dba617;
+	--schema-status-warning-bg: #fcf9e8;
+	--schema-status-info-bg: #f0f6fc;
 }
 
 .schema-plugin-admin {
@@ -559,6 +565,166 @@ fieldset.schema-field legend {
 	}
 }
 
+/* -- Entity form sections (wizard Details step + Settings → Site entity) -- */
+
+.schema-entity-intro {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--schema-space-2) var(--schema-space-4);
+	margin-bottom: var(--schema-space-3);
+
+	h2 {
+		margin-top: 0;
+	}
+}
+
+.schema-entity-type-line {
+	display: flex;
+	align-items: center;
+	gap: var(--schema-space-2);
+	margin: 0;
+}
+
+.schema-form-section {
+	padding: var(--schema-space-4) 0;
+	border-top: 1px solid #dcdcde;
+
+	&:first-child {
+		border-top: 0;
+		padding-top: 0;
+	}
+}
+
+.schema-form-section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--schema-space-3);
+	margin-bottom: var(--schema-space-3);
+}
+
+.schema-form-section-title {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.schema-form-section-count {
+	color: #50575e;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+// Collapsible sections (rarely needed fields): the summary is the heading.
+details.schema-form-section > summary.schema-form-section-head {
+	margin-bottom: 0;
+	cursor: pointer;
+	list-style: none;
+
+	&::-webkit-details-marker {
+		display: none;
+	}
+
+	.schema-form-section-title::before {
+		content: "";
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		margin-right: var(--schema-space-2);
+		border-right: 2px solid #50575e;
+		border-bottom: 2px solid #50575e;
+		transform: translateY(-2px) rotate(-45deg);
+		transition: transform 0.15s ease;
+	}
+}
+
+details.schema-form-section[open] > summary.schema-form-section-head {
+	margin-bottom: var(--schema-space-3);
+
+	.schema-form-section-title::before {
+		transform: translateY(-3px) rotate(45deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	details.schema-form-section .schema-form-section-title::before {
+		transition: none;
+	}
+}
+
+.schema-form-row {
+	margin-bottom: var(--schema-space-3);
+
+	&:last-child {
+		margin-bottom: 0;
+	}
+
+	&.is-paired {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: var(--schema-space-3);
+
+		@media (min-width: 783px) {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+}
+
+// Fields inside a row manage their own spacing via the row.
+.schema-form-cell .components-base-control {
+	margin-bottom: 0;
+}
+
+.schema-address-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--schema-space-3);
+
+	@media (min-width: 783px) {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+
+		> :first-child {
+			grid-column: 1 / -1;
+		}
+	}
+
+	.components-base-control {
+		margin-bottom: 0;
+	}
+}
+
+// Sticky save bar: stays in view while scrolling a long form.
+.schema-save-bar {
+	position: sticky;
+	bottom: 0;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: var(--schema-space-3);
+	margin-top: var(--schema-space-3);
+	padding: var(--schema-space-3) 0;
+	border-top: 1px solid #dcdcde;
+	background: #fff;
+}
+
+.schema-save-status {
+	margin-right: auto;
+	color: #50575e;
+
+	&.is-dirty {
+		color: #996800; // AA on white
+		font-weight: 600;
+	}
+}
+
+.schema-save-error {
+	color: var(--schema-status-error);
+}
+
 /* -- Shared bordered "inner card" (used inside a .schema-card page shell) - */
 
 .schema-inner-card {
@@ -573,116 +739,428 @@ fieldset.schema-field legend {
 }
 
 /* -- Dashboard ------------------------------------------------------------ */
+/*
+ * Fits one screen: header, three summary tiles, then "Needs attention"
+ * beside "Next step"; per-entry health details collapsed below. Cards are
+ * @wordpress/components <Card>; this only lays them out. Status colors
+ * follow wp-admin's notice palette and always come with text.
+ */
 
-.schema-dashboard-live-block,
-.schema-dashboard-glance-block,
-.schema-dashboard-recommendations,
-.schema-dashboard-quicklinks {
-	margin-bottom: var(--schema-space-5);
+.schema-dashboard {
+	max-width: 1280px;
+	margin: var(--schema-space-3) auto 0;
+
+	h2 {
+		margin: 0;
+		font-size: 14px;
+	}
 }
 
-.schema-dashboard-live-list {
-	list-style: none;
-	margin: var(--schema-space-2) 0 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--schema-space-2);
-}
-
-.schema-dashboard-live-list li {
+.schema-dashboard-head {
 	display: flex;
 	align-items: center;
-	gap: var(--schema-space-2);
-}
-
-.schema-dashboard-check {
-	color: var(--schema-color-green);
-	font-weight: 700;
-}
-
-.schema-dashboard-glance-list {
-	margin: var(--schema-space-2) 0 0;
-}
-
-.schema-dashboard-glance-row {
-	display: flex;
-	justify-content: space-between;
-	gap: var(--schema-space-3);
-	padding: var(--schema-space-2) 0;
-	border-bottom: 1px solid #f0f0f1;
-}
-
-.schema-dashboard-glance-row dt {
-	color: #646970;
-	font-weight: 600;
-}
-
-.schema-dashboard-glance-row dd {
-	margin: 0;
-}
-
-.schema-recommendation-card {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: var(--schema-space-3);
 	flex-wrap: wrap;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: var(--schema-space-3) var(--schema-space-4);
-	margin-bottom: var(--schema-space-2);
+	gap: var(--schema-space-2) var(--schema-space-3);
+	margin-bottom: var(--schema-space-3);
+
+	h1 {
+		margin: 0;
+		padding: 0;
+	}
 }
 
-.schema-recommendation-card.is-completed {
-	background: #f6fbf7;
-	border-color: #d3e8d6;
-	color: #646970;
-}
-
-.schema-recommendation-body {
-	flex: 1;
-	min-width: 240px;
-}
-
-.schema-recommendation-label {
+.schema-dashboard-type {
+	padding: var(--schema-space-1) var(--schema-space-2);
+	border-radius: 999px;
+	background: var(--schema-status-info-bg);
+	color: var(--schema-color-blue);
+	font-size: 12px;
 	font-weight: 600;
-	margin: 0 0 var(--schema-space-1);
 }
 
-.schema-recommendation-description {
-	color: #646970;
-	margin: 0;
+.schema-dashboard-change-type {
 	font-size: 13px;
 }
 
-.schema-recommendation-actions {
-	display: flex;
-	gap: var(--schema-space-2);
-	flex-wrap: wrap;
-}
-
-.schema-dashboard-dismissed summary {
-	cursor: pointer;
-	color: #646970;
-}
-
-.schema-dashboard-dismissed ul {
-	margin: var(--schema-space-2) 0 0 var(--schema-space-4);
-}
-
-.schema-dashboard-quicklinks-row {
-	display: flex;
+/* Tiles */
+.schema-tiles {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: var(--schema-space-3);
-	flex-wrap: wrap;
-	margin-top: var(--schema-space-2);
+	margin-bottom: var(--schema-space-3);
+
+	@media (min-width: 783px) {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
 }
 
-.schema-dashboard-quicklink {
-	border: 1px solid #dcdcde;
+.schema-tile {
+	.components-card__body {
+		display: flex;
+		flex-direction: column;
+		gap: var(--schema-space-2);
+		height: 100%;
+	}
+}
+
+.schema-tile-label {
+	color: #50575e;
+	font-size: 12px !important;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.schema-tile-link {
+	margin-top: auto;
+	font-size: 13px;
+}
+
+.schema-tile-counts {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.4;
+	list-style: none;
+
+	.is-error {
+		color: var(--schema-status-error);
+	}
+
+	.is-warning {
+		color: #996800; // AA contrast on white
+	}
+
+	&.is-ok {
+		color: var(--schema-color-green);
+	}
+}
+
+.schema-tile-issues {
+	&.is-error {
+		box-shadow: inset 4px 0 0 var(--schema-status-error);
+	}
+
+	&.is-warning {
+		box-shadow: inset 4px 0 0 var(--schema-status-warning);
+	}
+
+	&.is-ok {
+		box-shadow: inset 4px 0 0 var(--schema-color-green);
+	}
+}
+
+.schema-tile-facts {
+	margin: 0;
+	list-style: none;
+
+	li {
+		margin: 0 0 var(--schema-space-1);
+	}
+
+	li:first-child a {
+		font-weight: 600;
+	}
+}
+
+/* Panels */
+.schema-dashboard-panels {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--schema-space-3);
+	margin-bottom: var(--schema-space-3);
+
+	@media (min-width: 960px) {
+		grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+	}
+}
+
+.schema-attention-list {
+	margin: 0;
+	list-style: none;
+}
+
+.schema-attention-row {
+	display: flex;
+	align-items: baseline;
+	gap: var(--schema-space-2);
+	padding: var(--schema-space-2) 0;
+	border-top: 1px solid #f0f0f1;
+
+	&:first-child {
+		border-top: 0;
+		padding-top: 0;
+	}
+}
+
+.schema-attention-tag {
+	flex-shrink: 0;
+	padding: 1px var(--schema-space-2);
+	border-radius: 3px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.is-error .schema-attention-tag {
+	background: var(--schema-status-error-bg);
+	color: var(--schema-status-error);
+}
+
+.is-warning .schema-attention-tag {
+	background: var(--schema-status-warning-bg);
+	color: #6e5302; // AA contrast on the amber background
+}
+
+.schema-attention-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.schema-attention-fix {
+	flex-shrink: 0;
+	font-weight: 600;
+}
+
+.schema-attention-ok {
+	margin: 0;
+	padding-left: var(--schema-space-2);
+	box-shadow: inset 3px 0 0 var(--schema-color-green);
+}
+
+.schema-next-step-label {
+	margin: 0 0 var(--schema-space-1);
+	font-weight: 600;
+}
+
+.schema-next-step-description {
+	margin: 0 0 var(--schema-space-3);
+	color: #50575e;
+}
+
+.schema-next-step-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--schema-space-2);
+}
+
+.schema-next-step-more {
+	margin: var(--schema-space-3) 0 0;
+	color: #50575e;
+	font-size: 12px;
+}
+
+.schema-dashboard-welcome {
+	max-width: 640px;
+
+	h2 {
+		font-size: 18px;
+		margin-bottom: var(--schema-space-2);
+	}
+}
+
+/* Score (tiles + health details) */
+.schema-score {
+	display: flex;
+	align-items: center;
+	gap: var(--schema-space-3);
+	margin: 0;
+}
+
+.schema-score-bar {
+	flex: 1;
+	min-width: 120px;
+	max-width: 320px;
+	height: 8px;
 	border-radius: 4px;
-	padding: var(--schema-space-2) var(--schema-space-3);
-	text-decoration: none;
+	background: #f0f0f1;
+	overflow: hidden;
+
+	span {
+		display: block;
+		height: 100%;
+		background: #50575e;
+	}
+}
+
+.schema-score.is-large {
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--schema-space-2);
+
+	.schema-score-bar {
+		width: 100%;
+		max-width: none;
+		flex: none;
+	}
+
+	.schema-score-text {
+		font-size: 20px;
+	}
+}
+
+.schema-score-complete .schema-score-bar span {
+	background: var(--schema-color-green);
+}
+
+.schema-score-good .schema-score-bar span {
+	background: var(--schema-color-blue);
+}
+
+.schema-score-warning .schema-score-bar span {
+	background: var(--schema-status-warning);
+}
+
+.schema-score-weak .schema-score-bar span,
+.schema-score-error .schema-score-bar span {
+	background: var(--schema-status-error);
+}
+
+.schema-score-text {
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.schema-score-band {
+	margin-left: var(--schema-space-1);
+	font-weight: 400;
+	color: #50575e;
+	font-size: 13px;
+}
+
+/* Disclosure chevron: display:flex on <summary> removes the native
+   marker, so draw one (rotates when open) to keep it looking expandable. */
+.schema-health-details-section > summary,
+.schema-health-row > summary {
+	list-style: none;
+
+	&::-webkit-details-marker {
+		display: none;
+	}
+
+	&::before {
+		content: "";
+		flex-shrink: 0;
+		align-self: center;
+		width: 6px;
+		height: 6px;
+		border-right: 2px solid #50575e;
+		border-bottom: 2px solid #50575e;
+		transform: rotate(-45deg);
+		transition: transform 0.15s ease;
+	}
+}
+
+.schema-health-details-section[open] > summary::before,
+.schema-health-row[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.schema-health-details-section > summary::before,
+	.schema-health-row > summary::before {
+		transition: none;
+	}
+}
+
+.schema-health-row > summary .schema-health-name {
+	flex: 1;
+}
+
+/* Health details (collapsed below the fold) */
+.schema-health-details-section {
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	border-radius: 2px;
+
+	> summary {
+		display: flex;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: var(--schema-space-1) var(--schema-space-3);
+		padding: var(--schema-space-3) var(--schema-space-4);
+		cursor: pointer;
+
+		h2 {
+			display: inline;
+		}
+	}
+}
+
+.schema-health-details-body {
+	padding: 0 var(--schema-space-4) var(--schema-space-4);
+}
+
+.schema-health-group {
+	margin-top: var(--schema-space-3);
+}
+
+.schema-health-group-heading {
+	margin: 0 0 var(--schema-space-1);
+	color: #50575e;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.schema-health-row {
+	border-top: 1px solid #f0f0f1;
+
+	summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--schema-space-3);
+		flex-wrap: wrap;
+		padding: var(--schema-space-2) 0;
+		cursor: pointer;
+	}
+
+	summary .schema-score {
+		flex: 0 1 320px;
+	}
+}
+
+.schema-health-name {
+	font-weight: 600;
+}
+
+.schema-health-details {
+	padding: 0 0 var(--schema-space-3);
+
+	> a {
+		display: inline-block;
+		margin-top: var(--schema-space-2);
+	}
+}
+
+.schema-completeness-gaps {
+	margin: 0;
+	padding-left: var(--schema-space-3);
+	list-style: disc;
+
+	.is-error {
+		color: var(--schema-status-error);
+	}
+}
+
+.schema-completeness-ok {
+	margin: 0;
+	color: #50575e;
+}
+
+/* Settings header + Features tab */
+.schema-settings-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--schema-space-2);
+}
+
+.schema-feature-toggle {
+	margin-bottom: var(--schema-space-3);
 }
 
 /* -- Exclusions ------------------------------------------------------------ */
@@ -763,132 +1241,7 @@ fieldset.schema-field legend {
 	}
 }
 
-/* -- Completeness (v1.1 Phase 6) ------------------------------------------- */
-
-.schema-completeness {
-	margin-top: var(--schema-space-5);
-}
-
-.schema-score {
-	display: flex;
-	align-items: center;
-	gap: var(--schema-space-3);
-	margin: var(--schema-space-2) 0;
-}
-
-.schema-score-bar {
-	flex: 1;
-	max-width: 320px;
-	height: 8px;
-	border-radius: 4px;
-	background: #f0f0f1;
-	overflow: hidden;
-
-	span {
-		display: block;
-		height: 100%;
-		background: #50575e;
-	}
-}
-
-.schema-score-complete .schema-score-bar span {
-	background: var(--schema-color-green);
-}
-
-.schema-score-good .schema-score-bar span {
-	background: var(--schema-color-blue);
-}
-
-.schema-score-weak .schema-score-bar span,
-.schema-score-issues .schema-score-bar span {
-	background: var(--schema-color-error);
-}
-
-// Inside an item's flex header the bar would otherwise shrink to nothing.
-.schema-completeness-item-head .schema-score {
-	flex: 0 1 320px;
-	margin: 0;
-}
-
-.schema-score-bar {
-	min-width: 120px;
-}
-
-.schema-score-text {
-	font-weight: 600;
-	white-space: nowrap;
-}
-
-.schema-score-band {
-	margin-left: var(--schema-space-1);
-	font-weight: 400;
-	color: #50575e;
-}
-
-.schema-completeness-card {
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: var(--schema-space-4);
-	margin-top: var(--schema-space-3);
-
-	h3 {
-		margin: 0;
-	}
-}
-
-.schema-completeness-card-head,
-.schema-completeness-item-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--schema-space-3);
-	flex-wrap: wrap;
-}
-
-.schema-completeness-item {
-	border-top: 1px solid #f0f0f1;
-	padding-top: var(--schema-space-2);
-	margin-top: var(--schema-space-2);
-}
-
-.schema-completeness-item-name {
-	font-weight: 600;
-}
-
-.schema-completeness-gaps {
-	margin: var(--schema-space-1) 0 0;
-	padding-left: var(--schema-space-3);
-	list-style: disc;
-}
-
-.schema-completeness-ok {
-	margin: var(--schema-space-1) 0 0;
-	color: #50575e;
-}
-
-@media (max-width: 782px) {
-	.schema-score-bar {
-		max-width: none;
-	}
-}
-
-/* -- Dashboard head, Features, tabs (menu restructure) --------------------- */
-
-.schema-dashboard-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--schema-space-3);
-	flex-wrap: wrap;
-}
-
-.schema-features-card {
-	margin-top: var(--schema-space-5);
-
-	.schema-feature-row {
-		margin-bottom: var(--schema-space-2);
-	}
-}
+/* -- Settings / Content tabs --------------------------------------------- */
 
 .schema-tabs .components-tab-panel__tab-content {
 	padding-top: var(--schema-space-4);

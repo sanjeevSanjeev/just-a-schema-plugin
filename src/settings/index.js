@@ -1,5 +1,5 @@
 import { createRoot, lazy, Suspense } from '@wordpress/element';
-import { Spinner, TabPanel } from '@wordpress/components';
+import { Button, Spinner, TabPanel } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import '../shared/style.scss';
 
@@ -11,6 +11,7 @@ const EntityTab = lazy( () => import( /* webpackChunkName: "settings-entity" */ 
 const RulesTab = lazy( () => import( /* webpackChunkName: "settings-rules" */ './RulesTab' ) );
 const ExclusionsTab = lazy( () => import( /* webpackChunkName: "settings-exclusions" */ './ExclusionsTab' ) );
 const NetworkTab = lazy( () => import( /* webpackChunkName: "settings-network" */ './NetworkTab' ) );
+const FeaturesTab = lazy( () => import( /* webpackChunkName: "settings-features" */ './FeaturesTab' ) );
 
 const networkEnabled = ( bootstrap.features || [] ).some( ( feature ) => 'network' === feature.key && feature.enabled );
 
@@ -19,6 +20,7 @@ const TABS = [
 	{ name: 'rules', title: __( 'Default rules', 'schema-plugin' ), Component: RulesTab },
 	{ name: 'exclusions', title: __( 'Exclusions', 'schema-plugin' ), Component: ExclusionsTab },
 	...( networkEnabled ? [ { name: 'network', title: __( 'Network identity', 'schema-plugin' ), Component: NetworkTab } ] : [] ),
+	{ name: 'features', title: __( 'Features', 'schema-plugin' ), Component: FeaturesTab },
 ];
 
 /** The ?tab= query arg, so links, reloads and old-slug redirects land on the right tab. */
@@ -35,8 +37,9 @@ function rememberTab( name ) {
 
 /**
  * Settings -- one page for the sitewide configuration: Site entity,
- * Default rules and Exclusions (+ Network identity when that feature is
- * on). Replaces four separate admin pages.
+ * Default rules, Exclusions (+ Network identity when that feature is on)
+ * and Features. The setup wizard can be re-run from the header, whichever
+ * tab is open.
  */
 function SettingsPage() {
 	return (
@@ -44,7 +47,12 @@ function SettingsPage() {
 			<p className="schema-breadcrumb">
 				<a href={ bootstrap.dashboardUrl }>{ __( '← Dashboard', 'schema-plugin' ) }</a>
 			</p>
-			<h1>{ __( 'Settings', 'schema-plugin' ) }</h1>
+			<div className="schema-settings-head">
+				<h1>{ __( 'Settings', 'schema-plugin' ) }</h1>
+				<Button variant="tertiary" href={ bootstrap.wizardUrl }>
+					{ __( 'Re-run setup wizard', 'schema-plugin' ) }
+				</Button>
+			</div>
 			<TabPanel
 				className="schema-tabs"
 				tabs={ TABS.map( ( { name, title } ) => ( { name, title } ) ) }

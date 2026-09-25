@@ -6,7 +6,6 @@ import TextareaField from './fields/TextareaField';
 import SameAsBuilder from './fields/SameAsBuilder';
 import TypedField from './fields/TypedField';
 import withRequiredMark from './fields/withRequiredMark';
-import LivePreview from './LivePreview';
 import { getWizardCopy, getTypeIcon } from './wizardCopy';
 
 const bootstrap = window.SchemaPluginData || {};
@@ -174,11 +173,69 @@ export function TypePicker( { value, onChange } ) {
 }
 
 /**
- * The site-details field screen -- Tier 1 fields plus type-specific
- * extras (LocalBusiness Tier 1.5, or the 2-3 entity extras per other
- * locked type). Labels personalize to the chosen type via
+ * Sections, in priority order: what identifies you first, optional detail
+ * last. Keys not listed land in "Other details" so a new field is never
+ * hidden. Collapsed sections hold rarely needed fields.
+ */
+const SECTIONS = [
+	{
+		key: 'basics',
+		title: __( 'Basics', 'schema-plugin' ),
+		keys: [ 'name', 'logo', 'image', 'url', 'description', 'jobTitle' ],
+	},
+	{
+		key: 'contact',
+		title: __( 'Contact & location', 'schema-plugin' ),
+		keys: [ 'email', 'telephone', 'address', 'geo' ],
+	},
+	{ key: 'social', title: __( 'Social profiles', 'schema-plugin' ), keys: [ 'sameAs' ] },
+	{
+		key: 'business',
+		title: __( 'Business details', 'schema-plugin' ),
+		keys: [ 'openingHoursSpecification', 'priceRange', 'department' ],
+	},
+	{
+		key: 'store',
+		title: __( 'Store policies', 'schema-plugin' ),
+		keys: [ 'hasMerchantReturnPolicy', 'hasShippingService' ],
+	},
+	{
+		key: 'identity',
+		title: __( 'Legal & identifiers', 'schema-plugin' ),
+		keys: [ 'alternateName', 'legalName', 'vatID', 'taxID', 'foundingDate', 'founder' ],
+		collapsed: true,
+	},
+	{
+		key: 'reviews',
+		title: __( 'Reviews of other businesses', 'schema-plugin' ),
+		keys: [ 'aggregateRating', 'review' ],
+		collapsed: true,
+	},
+];
+
+// Short fields shown two to a row on wide screens.
+const PAIRED = [ 'email', 'telephone', 'alternateName', 'legalName', 'vatID', 'taxID', 'foundingDate', 'founder' ];
+
+function isFilled( fieldValue ) {
+	if ( Array.isArray( fieldValue ) ) {
+		return fieldValue.some( ( v ) => '' !== v && null !== v );
+	}
+	if ( fieldValue && 'object' === typeof fieldValue ) {
+		return Object.entries( fieldValue ).some( ( [ k, v ] ) => '@type' !== k && '' !== v && null !== v && undefined !== v );
+	}
+	return '' !== ( fieldValue ?? '' );
+}
+
+/**
+ * The site-details form -- Tier 1 fields plus type-specific extras, grouped
+ * into prioritized sections (shared by the wizard's Details step and
+ * Settings → Site entity). Labels personalize to the chosen type via
  * getWizardCopy() -- "Business name" rather than generic "Name" once
  * "Local or Small Business" is picked.
+ *
+ * A "Recommended" badge shows only while a field is empty, so the badges
+ * double as a to-do list instead of decorating every field; each section
+ * heading counts how many of its fields are filled.
  */
 export function EntityFields( { value, onChange } ) {
 	const { entity_type: entityType, fields = {} } = value;
@@ -193,68 +250,110 @@ export function EntityFields( { value, onChange } ) {
 		return null;
 	}
 
-	return (
-		<>
-			<div className="schema-field-group">
-				<TextControl
-					// Required for Person/LocalBusiness; Google only recommends it for Organization.
-					label={ withRequiredMark( copy.name_label, fieldDefs.name?.required ?? true ) }
-					value={ fields.name || '' }
-					onChange={ ( v ) => setField( 'name', v ) }
-				/>
-				<UrlField
-					label={ __( 'URL', 'schema-plugin' ) }
-					value={ fields.url }
-					onChange={ ( v ) => setField( 'url', v ) }
-					help={ __( 'Defaults to your homepage if left blank.', 'schema-plugin' ) }
-				/>
-				<TextareaField
-					label={ copy.description_label }
-					value={ fields.description }
-					onChange={ ( v ) => setField( 'description', v ) }
-					help={ copy.description_help }
-				/>
-				<SameAsBuilder value={ fields.sameAs } onChange={ ( v ) => setField( 'sameAs', v ) } />
+	const available = [ ...TIER1_KEYS, ...Object.keys( fieldDefs ).filter( ( key ) => ! TIER1_KEYS.includes( key ) ) ];
+	const placed = SECTIONS.flatMap( ( section ) => section.keys );
+	const sections = [
+		...SECTIONS,
+		{ key: 'other', title: __( 'Other details', 'schema-plugin' ), keys: available.filter( ( k ) => ! placed.includes( k ) ) },
+	]
+		.map( ( section ) => ( { ...section, keys: section.keys.filter( ( key ) => available.includes( key ) ) } ) )
+		.filter( ( section ) => section.keys.length );
+
+	const renderField = ( key ) => {
+		switch ( key ) {
+			case 'name':
+				return (
+					<TextControl
+						// Required for Person/LocalBusiness; Google only recommends it for Organization.
+						label={ withRequiredMark( copy.name_label, fieldDefs.name?.required ?? true ) }
+						value={ fields.name || '' }
+						onChange={ ( v ) => setField( 'name', v ) }
+					/>
+				);
+			case 'url':
+				return (
+					<UrlField
+						label={ __( 'URL', 'schema-plugin' ) }
+						value={ fields.url }
+						onChange={ ( v ) => setField( 'url', v ) }
+						help={ __( 'Defaults to your homepage if left blank.', 'schema-plugin' ) }
+					/>
+				);
+			case 'description':
+				return (
+					<TextareaField
+						label={ copy.description_label }
+						value={ fields.description }
+						onChange={ ( v ) => setField( 'description', v ) }
+						help={ copy.description_help }
+					/>
+				);
+			case 'sameAs':
+				return <SameAsBuilder value={ fields.sameAs } onChange={ ( v ) => setField( 'sameAs', v ) } />;
+			default: {
+				const def = fieldDefs[ key ] || {};
+				return (
+					<TypedField
+						fieldKey={ key }
+						def={ { ...def, recommended: !! def.recommended && ! isFilled( fields[ key ] ) } }
+						value={ fields[ key ] }
+						onChange={ ( v ) => setField( key, v ) }
+					/>
+				);
+			}
+		}
+	};
+
+	const renderSectionBody = ( section ) => {
+		const rows = [];
+		section.keys.forEach( ( key ) => {
+			const last = rows[ rows.length - 1 ];
+			if ( PAIRED.includes( key ) && last?.paired && 1 === last.keys.length ) {
+				last.keys.push( key );
+			} else {
+				rows.push( { paired: PAIRED.includes( key ), keys: [ key ] } );
+			}
+		} );
+		return rows.map( ( row ) => (
+			<div className={ row.paired ? 'schema-form-row is-paired' : 'schema-form-row' } key={ row.keys.join( '-' ) }>
+				{ row.keys.map( ( key ) => (
+					<div className="schema-form-cell" key={ key }>
+						{ renderField( key ) }
+					</div>
+				) ) }
 			</div>
-
-			{ Object.keys( fieldDefs ).length > 0 && (
-				<div className="schema-field-group">
-					{ Object.entries( fieldDefs )
-						.filter( ( [ key ] ) => ! TIER1_KEYS.includes( key ) )
-						.map( ( [ key, def ] ) => (
-							<TypedField
-								key={ key }
-								fieldKey={ key }
-								def={ def }
-								value={ fields[ key ] }
-								onChange={ ( v ) => setField( key, v ) }
-							/>
-						) ) }
-				</div>
-			) }
-		</>
-	);
-}
-
-/**
- * Composed type picker + field form -- CLAUDE.md Section 7 item 4: "the
- * SAME field form used in wizard Step 1... Reuse the same React
- * components... do not build a second, separate implementation." The
- * wizard uses <TypePicker> and <EntityFields> as separate screens; Entity
- * Settings uses this composed default export as one ongoing edit screen.
- * Controlled component: parent owns { entity_type, flavor, fields }.
- */
-export default function EntityForm( { value, onChange, showLivePreview = true } ) {
-	const { entity_type: entityType, flavor, fields = {} } = value;
+		) );
+	};
 
 	return (
-		<div className="schema-entity-form">
-			<TypePicker value={ value } onChange={ onChange } />
-			<EntityFields value={ value } onChange={ onChange } />
+		<div className="schema-entity-sections">
+			{ sections.map( ( section ) => {
+				const filled = section.keys.filter( ( key ) => isFilled( fields[ key ] ) ).length;
+				const count = sprintf(
+					/* translators: 1: number of filled fields, 2: number of fields in the section. */
+					__( '%1$d of %2$d filled', 'schema-plugin' ),
+					filled,
+					section.keys.length
+				);
+				const heading = (
+					<>
+						<h3 className="schema-form-section-title">{ section.title }</h3>
+						<span className="schema-form-section-count">{ count }</span>
+					</>
+				);
 
-			{ showLivePreview && entityType && (
-				<LivePreview payload={ { entity_type: entityType, flavor, fields } } />
-			) }
+				return section.collapsed ? (
+					<details className="schema-form-section is-collapsible" key={ section.key } open={ filled > 0 }>
+						<summary className="schema-form-section-head">{ heading }</summary>
+						{ renderSectionBody( section ) }
+					</details>
+				) : (
+					<section className="schema-form-section" key={ section.key }>
+						<div className="schema-form-section-head">{ heading }</div>
+						{ renderSectionBody( section ) }
+					</section>
+				);
+			} ) }
 		</div>
 	);
 }
