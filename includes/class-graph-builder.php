@@ -16,7 +16,7 @@
  * Do not change the resolution order below without updating CLAUDE.md —
  * it is deliberately: system exclusions -> backend exclusions ->
  * singleton nodes -> per-post override or default rule -> linked
- * entities (deferred, v1.1) -> graph filter -> output.
+ * entities + author fallback -> graph filter -> output.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -46,9 +46,13 @@ class Schema_Graph_Builder {
 			$payload['@context'] = 'https://schema.org';
 		}
 
-		echo '<script type="application/ld+json">'
-			. wp_json_encode( $payload, JSON_UNESCAPED_SLASHES )
-			. '</script>' . "\n";
+		$json = wp_json_encode( $payload, JSON_UNESCAPED_SLASHES );
+		// SECURITY (CLAUDE.md Section 10.5.B, blocking for MVP): wp_json_encode()
+		// does not stop a field value containing the literal string
+		// "</script>" from breaking out of this tag.
+		$json = str_replace( '</', '<\/', $json );
+
+		wp_print_inline_script_tag( $json, array( 'type' => 'application/ld+json' ) );
 	}
 
 	public static function build_for_current_request(): ?array {
@@ -60,7 +64,12 @@ class Schema_Graph_Builder {
 			return null;
 		}
 
-		$post_id = get_queried_object_id();
+		// Only a post (singular, or the static posts page) has a post ID.
+		// get_queried_object_id() would return a user ID on author archives
+		// and a term ID on taxonomy archives, which the per-post lookups
+		// below would then misread as a post ID.
+		$queried = get_queried_object();
+		$post_id = $queried instanceof WP_Post ? $queried->ID : 0;
 		$graph   = array();
 
 		// 1. Sitewide singleton nodes — present on every emitting page.
@@ -76,15 +85,17 @@ class Schema_Graph_Builder {
 			$graph[] = $primary_node;
 		}
 
-		// 3. Linked entities (Team/Services/Locations/Events/Authors) — DEFERRED,
-		// v1.1+. Schema_Entity_Registry::get_all_linked_entities() should return
-		// an empty array in MVP so this loop is a safe no-op until v1.1 builds
-		// the manager UIs referenced in CLAUDE.md Section 8.
-		if ( method_exists( 'Schema_Entity_Registry', 'get_all_linked_entities' ) ) {
+		// 3. Linked entities (Services/Team/Locations/Events) that emit on
+		// this page.
+		if ( $post_id ) {
 			foreach ( Schema_Entity_Registry::get_all_linked_entities() as $entity ) {
 				if ( Schema_Entity_Resolver::emits_on( $entity, $post_id ) ) {
 					$graph[] = Schema_Entity_Registry::render_entity_node( $entity );
 				}
+			}
+			$author_node = self::get_unresolved_author_node( $graph, $post_id );
+			if ( $author_node ) {
+				$graph[] = $author_node;
 			}
 		}
 
@@ -107,8 +118,33 @@ class Schema_Graph_Builder {
 			|| is_trackback();
 	}
 
+	/**
+	 * Author auto-link fallback: when the graph references the post
+	 * author's @id (e.g. an Article's `author`) but no node defines it --
+	 * the author has no auto-linked Team entry -- emit a profile-only
+	 * Person so the reference resolves.
+	 */
+	private static function get_unresolved_author_node( array $graph, int $post_id ): ?array {
+		$id_uri = Schema_Author_Profile::get_person_id_uri( (int) get_post_field( 'post_author', $post_id ) );
+		if ( ! $id_uri ) {
+			return null;
+		}
+
+		$referenced = false;
+		foreach ( $graph as $node ) {
+			if ( ( $node['@id'] ?? '' ) === $id_uri ) {
+				return null; // already defined.
+			}
+			if ( ! $referenced && str_contains( (string) wp_json_encode( $node, JSON_UNESCAPED_SLASHES ), '"' . $id_uri . '"' ) ) {
+				$referenced = true;
+			}
+		}
+
+		return $referenced ? Schema_Author_Profile::build_person_node( (int) get_post_field( 'post_author', $post_id ) ) : null;
+	}
+
 	private static function is_backend_excluded(): bool {
-		$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+		$path = trim( (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ), PHP_URL_PATH ), '/' );
 
 		foreach ( Schema_Settings::get_backend_exclusions() as $rule ) {
 			if ( empty( $rule['enabled'] ) ) {

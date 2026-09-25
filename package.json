@@ -1,0 +1,24 @@
+{
+  "name": "schema-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React admin surfaces for the Schema Plugin (wizard, post editor panel, Default Rules manager, Entity settings).",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "lint:js": "wp-scripts lint-js",
+    "format": "wp-scripts format"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  },
+  "dependencies": {
+    "@wordpress/api-fetch": "^7.0.0",
+    "@wordpress/components": "^28.0.0",
+    "@wordpress/data": "^10.0.0",
+    "@wordpress/edit-post": "^8.0.0",
+    "@wordpress/element": "^6.0.0",
+    "@wordpress/i18n": "^5.0.0",
+    "@wordpress/plugins": "^7.0.0"
+  }
+}

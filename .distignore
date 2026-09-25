@@ -1,0 +1,11 @@
+/.git
+/.gitignore
+/.distignore
+/.playwright-mcp
+/node_modules
+/src
+/CLAUDE.md
+/V1.1-PROGRESS.md
+/package.json
+/package-lock.json
+/webpack.config.js
