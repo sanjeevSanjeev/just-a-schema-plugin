@@ -227,17 +227,17 @@ function isFilled( fieldValue ) {
 }
 
 /**
- * The site-details form -- Tier 1 fields plus type-specific extras, grouped
- * into prioritized sections (shared by the wizard's Details step and
- * Settings → Site entity). Labels personalize to the chosen type via
- * getWizardCopy() -- "Business name" rather than generic "Name" once
- * "Local or Small Business" is picked.
+ * The site-details form's building blocks -- Tier 1 fields plus
+ * type-specific extras, grouped into prioritized sections, shared by the
+ * wizard's Details step (<EntityFields>, stacked) and Settings → Site
+ * entity (section list + one section at a time). Labels personalize to the
+ * chosen type via getWizardCopy() -- "Business name" rather than generic
+ * "Name" once "Local or Small Business" is picked.
  *
  * A "Recommended" badge shows only while a field is empty, so the badges
- * double as a to-do list instead of decorating every field; each section
- * heading counts how many of its fields are filled.
+ * double as a to-do list; each section reports how many fields are filled.
  */
-export function EntityFields( { value, onChange } ) {
+export function useEntitySections( { value, onChange } ) {
 	const { entity_type: entityType, fields = {} } = value;
 	const copy = getWizardCopy( entityType );
 	const fieldDefs = getFieldDefsFor( entityType );
@@ -246,17 +246,18 @@ export function EntityFields( { value, onChange } ) {
 		onChange( { ...value, fields: { ...fields, [ key ]: fieldValue } } );
 	};
 
-	if ( ! entityType ) {
-		return null;
-	}
-
-	const available = [ ...TIER1_KEYS, ...Object.keys( fieldDefs ).filter( ( key ) => ! TIER1_KEYS.includes( key ) ) ];
+	const available = entityType
+		? [ ...TIER1_KEYS, ...Object.keys( fieldDefs ).filter( ( key ) => ! TIER1_KEYS.includes( key ) ) ]
+		: [];
 	const placed = SECTIONS.flatMap( ( section ) => section.keys );
 	const sections = [
 		...SECTIONS,
 		{ key: 'other', title: __( 'Other details', 'schema-plugin' ), keys: available.filter( ( k ) => ! placed.includes( k ) ) },
 	]
-		.map( ( section ) => ( { ...section, keys: section.keys.filter( ( key ) => available.includes( key ) ) } ) )
+		.map( ( section ) => {
+			const keys = section.keys.filter( ( key ) => available.includes( key ) );
+			return { ...section, keys, filled: keys.filter( ( key ) => isFilled( fields[ key ] ) ).length };
+		} )
 		.filter( ( section ) => section.keys.length );
 
 	const renderField = ( key ) => {
@@ -325,25 +326,44 @@ export function EntityFields( { value, onChange } ) {
 		) );
 	};
 
+	return { sections, renderSectionBody };
+}
+
+/** "N of M filled" for a section from useEntitySections(). */
+export function filledLabel( section ) {
+	return sprintf(
+		/* translators: 1: number of filled fields, 2: number of fields in the section. */
+		__( '%1$d of %2$d filled', 'schema-plugin' ),
+		section.filled,
+		section.keys.length
+	);
+}
+
+/**
+ * Stacked layout of the site-details form: every section in priority
+ * order down one column (the wizard's Details step, a linear flow in a
+ * 720px column). Settings → Site entity shows the same sections one at a
+ * time with a section list instead (see EntityTab).
+ */
+export function EntityFields( { value, onChange } ) {
+	const { sections, renderSectionBody } = useEntitySections( { value, onChange } );
+
+	if ( ! value.entity_type ) {
+		return null;
+	}
+
 	return (
 		<div className="schema-entity-sections">
 			{ sections.map( ( section ) => {
-				const filled = section.keys.filter( ( key ) => isFilled( fields[ key ] ) ).length;
-				const count = sprintf(
-					/* translators: 1: number of filled fields, 2: number of fields in the section. */
-					__( '%1$d of %2$d filled', 'schema-plugin' ),
-					filled,
-					section.keys.length
-				);
 				const heading = (
 					<>
 						<h3 className="schema-form-section-title">{ section.title }</h3>
-						<span className="schema-form-section-count">{ count }</span>
+						<span className="schema-form-section-count">{ filledLabel( section ) }</span>
 					</>
 				);
 
 				return section.collapsed ? (
-					<details className="schema-form-section is-collapsible" key={ section.key } open={ filled > 0 }>
+					<details className="schema-form-section is-collapsible" key={ section.key } open={ section.filled > 0 }>
 						<summary className="schema-form-section-head">{ heading }</summary>
 						{ renderSectionBody( section ) }
 					</details>

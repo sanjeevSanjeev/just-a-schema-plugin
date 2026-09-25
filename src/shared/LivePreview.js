@@ -17,9 +17,16 @@ import { preview as previewApi } from './api';
  *
  * @param {Object}  props
  * @param {Object}  props.payload     Body to POST to /preview.
- * @param {boolean} [props.defaultOpen]
+ * @param {boolean}  [props.defaultOpen]
+ * @param {boolean}  [props.collapsible] False renders without the <details> wrapper (e.g. inside a panel that is itself the disclosure).
+ * @param {Function} [props.onResult]    Called with each /preview result (e.g. to show a warning count elsewhere).
  */
-export default function LivePreview( { payload, defaultOpen = false } ) {
+export default function LivePreview( {
+	payload,
+	defaultOpen = false,
+	collapsible = true,
+	onResult,
+} ) {
 	const [ result, setResult ] = useState( null );
 	const [ loading, setLoading ] = useState( false );
 	const debounceRef = useRef();
@@ -39,13 +46,19 @@ export default function LivePreview( { payload, defaultOpen = false } ) {
 				.then( ( res ) => {
 					if ( requestId === requestIdRef.current ) {
 						setResult( res );
+						onResult?.( res );
 					}
 				} )
 				.catch( () => {
 					if ( requestId === requestIdRef.current ) {
 						setResult( {
 							node: null,
-							warnings: [ __( 'Preview failed to load.', 'schema-plugin' ) ],
+							warnings: [
+								__(
+									'Preview failed to load.',
+									'schema-plugin'
+								),
+							],
 						} );
 					}
 				} )
@@ -62,28 +75,36 @@ export default function LivePreview( { payload, defaultOpen = false } ) {
 
 	const warnings = result?.warnings || [];
 
+	const body = (
+		<div className="schema-live-preview-body">
+			{ loading && <Spinner /> }
+
+			{ ! loading && warnings.length > 0 && (
+				<Notice status="warning" isDismissible={ false }>
+					<ul>
+						{ warnings.map( ( warning ) => (
+							<li key={ warning }>{ warning }</li>
+						) ) }
+					</ul>
+				</Notice>
+			) }
+
+			{ ! loading && (
+				<pre className="schema-live-preview-json">
+					{ JSON.stringify( result?.node ?? null, null, 2 ) }
+				</pre>
+			) }
+		</div>
+	);
+
+	if ( ! collapsible ) {
+		return <div className="schema-live-preview is-static">{ body }</div>;
+	}
+
 	return (
 		<details className="schema-live-preview" open={ defaultOpen }>
 			<summary>{ __( 'Show live preview', 'schema-plugin' ) }</summary>
-			<div className="schema-live-preview-body">
-				{ loading && <Spinner /> }
-
-				{ ! loading && warnings.length > 0 && (
-					<Notice status="warning" isDismissible={ false }>
-						<ul>
-							{ warnings.map( ( warning ) => (
-								<li key={ warning }>{ warning }</li>
-							) ) }
-						</ul>
-					</Notice>
-				) }
-
-				{ ! loading && (
-					<pre className="schema-live-preview-json">
-						{ JSON.stringify( result?.node ?? null, null, 2 ) }
-					</pre>
-				) }
-			</div>
+			{ body }
 		</details>
 	);
 }
