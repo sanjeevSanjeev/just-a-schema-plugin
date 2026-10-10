@@ -98,8 +98,10 @@ class Schema_Graph_Builder {
 		if ( ! $primary_node ) {
 			$primary_node = Schema_Default_Rules::resolve( $post_id );
 		}
+		$primary_index = null;
 		if ( $primary_node ) {
-			$graph[] = $primary_node;
+			$graph[]       = $primary_node;
+			$primary_index = count( $graph ) - 1;
 		}
 
 		// 3. Linked entities (Services/Team/Locations/Events) that emit on
@@ -114,6 +116,11 @@ class Schema_Graph_Builder {
 			if ( $author_node ) {
 				$graph[] = $author_node;
 			}
+		}
+
+		// 4. Author archive: describe the author as a ProfilePage.
+		if ( 0 === $post_id && null !== $primary_index && is_author() ) {
+			$graph = self::add_author_archive_nodes( $graph, $primary_index );
 		}
 
 		/**
@@ -133,6 +140,55 @@ class Schema_Graph_Builder {
 			|| is_feed()
 			|| is_robots()
 			|| is_trackback();
+	}
+
+	/**
+	 * Author archives: when the page's own node is still the plain default
+	 * WebPage, make it a ProfilePage about the author (Google's ProfilePage
+	 * needs a mainEntity Person with a name) and emit that Person: the
+	 * author's auto-linked Team entry if they have one, else the
+	 * profile-only fallback. A page matched by a custom rule keeps its
+	 * node; the author is only described when the page says it's a profile.
+	 *
+	 * @param array $graph         Graph so far.
+	 * @param int   $primary_index Index of the page's own node.
+	 * @return array
+	 */
+	private static function add_author_archive_nodes( array $graph, int $primary_index ): array {
+		$user = get_queried_object();
+		if ( ! $user instanceof WP_User || 'WebPage' !== ( $graph[ $primary_index ]['@type'] ?? '' ) ) {
+			return $graph;
+		}
+
+		$person = null;
+		foreach ( Schema_Entity_Registry::get_all_linked_entities() as $entity ) {
+			if ( Schema_Entity_Resolver::is_author_entry( $entity, (int) $user->ID ) ) {
+				$person = Schema_Entity_Registry::render_entity_node( $entity );
+				break;
+			}
+		}
+		if ( ! $person ) {
+			$person = Schema_Author_Profile::build_person_node( (int) $user->ID );
+		}
+		if ( ! $person || empty( $person['@id'] ) || empty( $person['name'] ) ) {
+			return $graph;
+		}
+
+		$page          = $graph[ $primary_index ];
+		$page['@type'] = 'ProfilePage';
+		if ( ! empty( $page['@id'] ) ) {
+			$page['@id'] = str_replace( '#webpage', '#profilepage', (string) $page['@id'] );
+		}
+		$page['mainEntity']      = array( '@id' => $person['@id'] );
+		$graph[ $primary_index ] = $page;
+
+		foreach ( $graph as $node ) {
+			if ( ( $node['@id'] ?? '' ) === $person['@id'] ) {
+				return $graph; // already defined.
+			}
+		}
+		$graph[] = $person;
+		return $graph;
 	}
 
 	/**

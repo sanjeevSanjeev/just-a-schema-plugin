@@ -39,6 +39,22 @@ class Schema_Entity_Resolver {
 	}
 
 	/**
+	 * Whether an entity is the auto-linked (post author) entry for a user.
+	 * Used on author archives, where there's no post to check emits_on()
+	 * against.
+	 *
+	 * @param Schema_Linked_Content_Entity $entity  Entity to check.
+	 * @param int                          $user_id WordPress user ID.
+	 * @return bool
+	 */
+	public static function is_author_entry( Schema_Linked_Content_Entity $entity, int $user_id ): bool {
+		return 'auto' === $entity->link_mode
+			&& 'post_author' === $entity->auto_link_source
+			&& $user_id > 0
+			&& (int) $entity->wp_user_id === $user_id;
+	}
+
+	/**
 	 * Auto-link strategies. Add new cases here as new sources are supported
 	 * (e.g. 'post_tag', 'custom_field') without touching manual-mode logic
 	 * or any individual manager (Team, Services, etc.).
