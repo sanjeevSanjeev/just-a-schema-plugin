@@ -9,6 +9,14 @@
  * Schema_Linked_Entity_Types, verified 2026-09 in Phase 5), and lists
  * concrete issues that stop an entry being useful.
  *
+ * Pages on the site default are scored as a sample, grouped per default
+ * rule ("Pages on site defaults"): the most recently edited published
+ * pages that have no custom block are resolved through the Default Rules
+ * exactly as the frontend does, and each rule reports the average score
+ * and how many of its sampled pages miss each field (a post without a
+ * featured image has no image). A page whose rule only points back at
+ * the sitewide entity is skipped, and so is a type with no flagged fields.
+ *
  * Pages with a customized schema block (post meta) are scored too, as a
  * "Customized pages" group, against the verified per-type field sets
  * (Schema_Types::get_field_defs(): Article, Product, LocalBusiness...).
@@ -54,6 +62,9 @@ class Schema_Completeness {
 	/** Most customized pages scored per report; the rest are counted in the note. */
 	const MAX_PAGES = 50;
 
+	/** Most default-rule pages sampled per report. */
+	const MAX_DEFAULT_PAGES = 100;
+
 	public static function get_report(): array {
 		$entity = self::score_entity();
 
@@ -77,12 +88,13 @@ class Schema_Completeness {
 			);
 		}
 
-		$pages = self::score_pages();
-		if ( $pages ) {
-			foreach ( $pages['items'] as $item ) {
-				$all_scores[] = $item['score'];
+		foreach ( array( self::score_pages(), self::score_default_pages() ) as $pages ) {
+			if ( $pages ) {
+				foreach ( $pages['items'] as $item ) {
+					$all_scores[] = $item['score'];
+				}
+				$groups[] = $pages;
 			}
-			$groups[] = $pages;
 		}
 
 		// The sitewide entity counts as much as all linked entries together.
@@ -227,6 +239,184 @@ class Schema_Completeness {
 			'edit_url'    => '',
 			'note'        => implode( ' ', $notes ),
 			'items'       => $items,
+		);
+	}
+
+	/**
+	 * The "Pages on site defaults" group, or null when there's nothing to
+	 * score. Samples the most recently edited published pages without a
+	 * custom block and aggregates per default rule.
+	 *
+	 * @return array|null
+	 */
+	private static function score_default_pages(): ?array {
+		$query = new WP_Query(
+			array(
+				'post_type'              => array_diff( get_post_types( array( 'public' => true ) ), array( 'attachment' ) ),
+				'post_status'            => 'publish',
+				'meta_query'             => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'     => Schema_Post_Meta::META_KEY,
+						'compare' => 'NOT EXISTS',
+					),
+				),
+				'posts_per_page'         => self::MAX_DEFAULT_PAGES,
+				'orderby'                => 'modified',
+				'order'                  => 'DESC',
+				'fields'                 => 'ids',
+				'update_post_term_cache' => false,
+			)
+		);
+		if ( ! $query->posts ) {
+			return null;
+		}
+
+		$labels  = array_merge( self::block_labels(), array( 'image' => __( 'Featured image', 'schema-plugin' ) ) );
+		$by_rule = array();
+		$skipped = 0;
+		foreach ( $query->posts as $post_id ) {
+			$permalink = get_permalink( $post_id );
+			$path      = $permalink ? trim( (string) wp_parse_url( $permalink, PHP_URL_PATH ), '/' ) : '';
+			$resolved  = Schema_Default_Rules::resolve_with_rule( (int) $post_id, $path );
+			if ( ! $resolved || array_keys( $resolved['node'] ) === array( '@id' ) ) {
+				continue; // No rule, or a reference to the sitewide entity (scored on its own).
+			}
+
+			$type = (string) ( $resolved['node']['@type'] ?? 'WebPage' );
+			$defs = Schema_Types::get_field_defs( $type );
+			foreach ( $labels as $key => $label ) {
+				if ( isset( $defs[ $key ] ) && empty( $defs[ $key ]['label'] ) ) {
+					$defs[ $key ]['label'] = $label;
+				}
+			}
+			$flagged = array_filter( $defs, static fn( $def ) => ! empty( $def['required'] ) || ! empty( $def['recommended'] ) || ! empty( $def['one_of'] ) );
+			$scored  = self::score_node( $resolved['node'], $defs );
+			$issues  = self::field_issues( $resolved['node'], $defs );
+			if ( ! $flagged && ! $issues ) {
+				++$skipped;
+				continue;
+			}
+
+			$rule_id = (string) ( $resolved['rule']['id'] ?? $type );
+			if ( ! isset( $by_rule[ $rule_id ] ) ) {
+				$by_rule[ $rule_id ] = array(
+					'type'        => $type,
+					'match'       => $resolved['rule']['match'] ?? array(),
+					'count'       => 0,
+					'score_sum'   => 0,
+					'required'    => array(),
+					'recommended' => array(),
+					'issues'      => array(),
+				);
+			}
+			++$by_rule[ $rule_id ]['count'];
+			$by_rule[ $rule_id ]['score_sum'] += $scored['score'];
+			foreach ( $scored['missing_required'] as $label ) {
+				$by_rule[ $rule_id ]['required'][ $label ] = ( $by_rule[ $rule_id ]['required'][ $label ] ?? 0 ) + 1;
+			}
+			foreach ( $scored['missing_recommended'] as $label ) {
+				$by_rule[ $rule_id ]['recommended'][ $label ] = ( $by_rule[ $rule_id ]['recommended'][ $label ] ?? 0 ) + 1;
+			}
+			foreach ( $issues as $issue ) {
+				$seen = $by_rule[ $rule_id ]['issues'][ $issue['text'] ]['count'] ?? 0;
+
+				$by_rule[ $rule_id ]['issues'][ $issue['text'] ] = array(
+					'count'    => $seen + 1,
+					'severity' => $issue['severity'],
+				);
+			}
+		}
+
+		$items = array();
+		foreach ( $by_rule as $rule_id => $agg ) {
+			$items[] = self::default_rule_item( (string) $rule_id, $agg );
+		}
+		if ( ! $items ) {
+			return null;
+		}
+
+		$notes = array(
+			sprintf(
+				/* translators: %d: number of pages checked. */
+				_n( 'Based on the %d most recently edited page on the site default.', 'Based on the %d most recently edited pages on the site default.', count( $query->posts ), 'schema-plugin' ),
+				count( $query->posts )
+			),
+		);
+		if ( $query->found_posts > self::MAX_DEFAULT_PAGES ) {
+			$notes[] = sprintf(
+				/* translators: %d: number of pages not checked. */
+				__( '%d older pages were not checked.', 'schema-plugin' ),
+				$query->found_posts - self::MAX_DEFAULT_PAGES
+			);
+		}
+		if ( $skipped ) {
+			$notes[] = __( 'Pages whose type has no Google-recommended fields are not listed.', 'schema-plugin' );
+		}
+
+		return array(
+			'entity_type' => 'default_pages',
+			'label'       => __( 'Pages on site defaults', 'schema-plugin' ),
+			'edit_url'    => Schema_Admin::page_url( Schema_Admin::PAGE_SETTINGS, 'rules' ),
+			'note'        => implode( ' ', $notes ),
+			'items'       => $items,
+		);
+	}
+
+	/**
+	 * One aggregated entry for a default rule.
+	 *
+	 * @param string $rule_id Rule ID.
+	 * @param array  $agg     Counts gathered by score_default_pages().
+	 * @return array
+	 */
+	private static function default_rule_item( string $rule_id, array $agg ): array {
+		$count = (int) $agg['count'];
+		$with  = static function ( array $counts ) use ( $count ): array {
+			arsort( $counts );
+			$out = array();
+			foreach ( $counts as $label => $n ) {
+				$out[] = sprintf(
+					/* translators: 1: field label, 2: pages missing it, 3: pages checked. */
+					_n( '%1$s (%2$d of %3$d page)', '%1$s (%2$d of %3$d pages)', $count, 'schema-plugin' ),
+					$label,
+					$n,
+					$count
+				);
+			}
+			return $out;
+		};
+
+		$issues = array();
+		foreach ( $agg['issues'] as $text => $info ) {
+			$issues[] = self::issue(
+				sprintf(
+					/* translators: 1: number of pages, 2: the problem. */
+					_n( '%1$d page: %2$s', '%1$d pages: %2$s', $info['count'], 'schema-plugin' ),
+					$info['count'],
+					$text
+				),
+				$info['severity']
+			);
+		}
+
+		$match    = $agg['match'];
+		$edit_url = ( 'post_type' === ( $match['type'] ?? '' ) && is_string( $match['value'] ?? null ) )
+			? admin_url( 'edit.php?post_type=' . rawurlencode( $match['value'] ) )
+			: Schema_Admin::page_url( Schema_Admin::PAGE_SETTINGS, 'rules' );
+
+		return array(
+			'id'                  => $rule_id,
+			'name'                => sprintf(
+				/* translators: 1: schema.org type, 2: number of pages checked. */
+				_n( '%1$s (%2$d page)', '%1$s (%2$d pages)', $count, 'schema-plugin' ),
+				$agg['type'],
+				$count
+			),
+			'score'               => (int) round( $agg['score_sum'] / $count ),
+			'missing_required'    => $with( $agg['required'] ),
+			'missing_recommended' => $with( $agg['recommended'] ),
+			'issues'              => $issues,
+			'edit_url'            => $edit_url,
 		);
 	}
 

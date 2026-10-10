@@ -49,9 +49,28 @@ class Schema_Default_Rules {
 	 * First matching rule wins -- CLAUDE.md Section 3.4/4.
 	 */
 	public static function resolve( int $post_id ): ?array {
+		$resolved = self::resolve_with_rule( $post_id );
+		return $resolved ? $resolved['node'] : null;
+	}
+
+	/**
+	 * Like resolve(), but also returns the rule that matched.
+	 *
+	 * @param int         $post_id Post ID.
+	 * @param string|null $path    Request path to match url_pattern rules
+	 *                             against, trimmed of slashes. Null uses the
+	 *                             current request; the Completeness report
+	 *                             passes each page's own path, since it runs
+	 *                             inside a REST request.
+	 * @return array{rule: array, node: array}|null
+	 */
+	public static function resolve_with_rule( int $post_id, ?string $path = null ): ?array {
 		foreach ( self::get_ordered_rules() as $rule ) {
-			if ( self::rule_matches( $rule, $post_id ) ) {
-				return self::build_node( $rule, $post_id );
+			if ( self::rule_matches( $rule, $post_id, $path ) ) {
+				return array(
+					'rule' => $rule,
+					'node' => self::build_node( $rule, $post_id ),
+				);
 			}
 		}
 		return null;
@@ -106,7 +125,15 @@ class Schema_Default_Rules {
 		return $node;
 	}
 
-	private static function rule_matches( array $rule, int $post_id ): bool {
+	/**
+	 * Whether a rule matches a post.
+	 *
+	 * @param array       $rule         Default rule.
+	 * @param int         $post_id      Post ID (0 on archives).
+	 * @param string|null $request_path Path for url_pattern rules; null uses the current request.
+	 * @return bool
+	 */
+	private static function rule_matches( array $rule, int $post_id, ?string $request_path = null ): bool {
 		$match = $rule['match'] ?? array();
 		$type  = $match['type'] ?? 'catch_all';
 		$value = $match['value'] ?? null;
@@ -136,7 +163,9 @@ class Schema_Default_Rules {
 				return (bool) has_term( $value['term'] ?? '', $value['taxonomy'] ?? '', $post_id );
 
 			case 'url_pattern':
-				$path    = trim( (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ), PHP_URL_PATH ), '/' );
+				$path    = null !== $request_path
+					? $request_path
+					: trim( (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ), PHP_URL_PATH ), '/' );
 				$pattern = trim( (string) $value, '/' );
 				$regex   = '#^' . str_replace( '\*', '.*', preg_quote( $pattern, '#' ) ) . '$#i';
 				return (bool) preg_match( $regex, $path );
