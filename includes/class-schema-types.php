@@ -381,6 +381,61 @@ class Schema_Types {
 		),
 	);
 
+	/**
+	 * Article and BlogPosting per-post fields. Source: Google's Article
+	 * doc (developers.google.com/search/docs/appearance/structured-data/
+	 * article, updated 2026-09-08, checked 2026-10-10). Google lists no
+	 * required properties; headline, image, datePublished, dateModified and
+	 * author are recommended. `author` and `publisher` are added as @id
+	 * references by Schema_Post_Meta::build_block_node(), not edited here.
+	 */
+	const ARTICLE_BLOCK_FIELDS = array(
+		'headline'      => array(
+			'required'    => false,
+			'recommended' => true,
+			'nudge'       => true,
+			'type'        => 'text',
+		),
+		'image'         => array(
+			'required'    => false,
+			'recommended' => true,
+			'nudge'       => true,
+			'type'        => 'media',
+		),
+		'datePublished' => array(
+			'required'    => false,
+			'recommended' => true,
+			'nudge'       => true,
+			'type'        => 'date',
+		),
+		'dateModified'  => array(
+			'required'    => false,
+			'recommended' => true,
+			'type'        => 'date',
+		),
+	);
+
+	/**
+	 * Product per-post fields. Source: Google's Product snippet doc
+	 * (developers.google.com/search/docs/appearance/structured-data/
+	 * product-snippet, updated 2026-09-08, checked 2026-10-10): `name` is
+	 * required, and so is one of offers, review or aggregateRating. Only
+	 * `offers` is editable here (`one_of` lists the alternatives the raw
+	 * JSON-LD can supply instead). An Offer requires `price`; priceCurrency,
+	 * availability and priceValidUntil are recommended.
+	 */
+	const PRODUCT_BLOCK_FIELDS = array(
+		'image'  => array(
+			'required' => false,
+			'type'     => 'media',
+		),
+		'offers' => array(
+			'required' => false,
+			'type'     => 'offer',
+			'one_of'   => array( 'offers', 'review', 'aggregateRating' ),
+		),
+	);
+
 	/** Token templates shared across all seeded Default Rules -- CLAUDE.md Section 3.4. */
 	const TEMPLATE_BY_SCHEMA_TYPE = array(
 		'WebPage'        => array(
@@ -737,7 +792,42 @@ class Schema_Types {
 			return array_merge( self::TIER1_COMMON_FIELDS, self::LOCAL_BUSINESS_FIELDS );
 		}
 
-		return array_merge( self::TIER1_COMMON_FIELDS, self::GENERIC_BLOCK_FIELDS );
+		if ( in_array( $type_identifier, array( 'Article', 'BlogPosting' ), true ) ) {
+			return array_merge( self::block_common_fields(), self::ARTICLE_BLOCK_FIELDS );
+		}
+
+		if ( 'Product' === $type_identifier ) {
+			// Google requires name for Product snippets, so Tier 1's stays.
+			return array_merge( self::TIER1_COMMON_FIELDS, self::PRODUCT_BLOCK_FIELDS );
+		}
+
+		return array_merge( self::block_common_fields(), self::GENERIC_BLOCK_FIELDS );
+	}
+
+	/**
+	 * Tier 1 for per-post types Google has no required fields for (Article,
+	 * WebPage, Service, CollectionPage...): `name` stays editable but isn't
+	 * claimed as required, since the lint would otherwise tell users Google
+	 * requires something it doesn't.
+	 */
+	private static function block_common_fields(): array {
+		$fields                     = self::TIER1_COMMON_FIELDS;
+		$fields['name']['required'] = false;
+		return $fields;
+	}
+
+	/**
+	 * Field definitions for every per-post type that has its own set, for
+	 * the editor (the rest use the default). Keyed by schema.org @type.
+	 */
+	public static function get_block_field_defs(): array {
+		return array(
+			'_default'      => self::get_field_defs( 'WebPage' ),
+			'Article'       => self::get_field_defs( 'Article' ),
+			'BlogPosting'   => self::get_field_defs( 'BlogPosting' ),
+			'Product'       => self::get_field_defs( 'Product' ),
+			'LocalBusiness' => self::get_field_defs( 'LocalBusiness' ),
+		);
 	}
 
 	/**

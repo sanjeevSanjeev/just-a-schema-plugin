@@ -422,15 +422,12 @@ class Schema_Rest_Controller {
 		if ( $schema_type ) {
 			$schema_type  = sanitize_text_field( (string) $schema_type );
 			$field_defs   = Schema_Types::get_field_defs( $schema_type );
-			$clean_fields = Schema_Sanitizer::sanitize_fields( $fields, $field_defs );
+			// Saving moves fields the type doesn't define into legacy, so the
+			// preview drops them too and matches what goes live.
+			$clean_fields = array_intersect_key( Schema_Sanitizer::sanitize_fields( $fields, $field_defs ), $field_defs );
 
-			$post_id   = absint( $request->get_param( 'post_id' ) );
-			$node      = array( '@type' => $schema_type );
-			$permalink = $post_id ? get_permalink( $post_id ) : '';
-			if ( $permalink ) {
-				$node['@id'] = trailingslashit( $permalink ) . '#' . strtolower( $schema_type );
-			}
-			$node = array_merge( $node, $clean_fields );
+			$post_id = absint( $request->get_param( 'post_id' ) );
+			$node    = Schema_Post_Meta::build_block_node( $post_id, $schema_type, $clean_fields );
 
 			return new WP_REST_Response(
 				array(

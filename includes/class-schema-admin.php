@@ -315,6 +315,7 @@ class Schema_Admin {
 				'localBusiness' => Schema_Types::LOCAL_BUSINESS_FIELDS,
 				'entityExtra'   => Schema_Types::get_entity_extra_fields(),
 				'genericBlock'  => Schema_Types::GENERIC_BLOCK_FIELDS,
+				'block'         => Schema_Types::get_block_field_defs(),
 			),
 			'wizardCompletedAt'      => Schema_Settings::get_wizard_completed_at(),
 			'isWooCommerceActive'    => Schema_Settings::is_woocommerce_active(),

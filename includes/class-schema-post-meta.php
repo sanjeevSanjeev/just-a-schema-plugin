@@ -48,19 +48,45 @@ class Schema_Post_Meta {
 			return is_array( $decoded ) ? $decoded : null;
 		}
 
-		$schema_type = $block['schema_type'] ?? 'WebPage';
-		$node        = array( '@type' => $schema_type );
+		return self::build_block_node( $post_id, (string) ( $block['schema_type'] ?? 'WebPage' ), (array) ( $block['fields'] ?? array() ) );
+	}
 
-		$permalink = get_permalink( $post_id );
+	/**
+	 * The node for a structured block. Shared by the live graph and the
+	 * /preview endpoint so the two can't drift.
+	 *
+	 * Article and BlogPosting also get `author` and `publisher` as @id
+	 * references (the same ones the default rule uses) unless the block
+	 * sets them. Without this, customizing a post's Article would silently
+	 * drop both, which Google recommends for articles.
+	 */
+	public static function build_block_node( int $post_id, string $schema_type, array $fields ): array {
+		$node      = array( '@type' => $schema_type );
+		$permalink = $post_id > 0 ? get_permalink( $post_id ) : '';
 		if ( $permalink ) {
 			$node['@id'] = trailingslashit( $permalink ) . '#' . strtolower( $schema_type );
 		}
 
-		foreach ( (array) ( $block['fields'] ?? array() ) as $key => $value ) {
+		foreach ( $fields as $key => $value ) {
 			if ( '' === $value || array() === $value || null === $value ) {
 				continue;
 			}
 			$node[ $key ] = $value;
+		}
+
+		if ( in_array( $schema_type, array( 'Article', 'BlogPosting' ), true ) ) {
+			$refs = Schema_Token_Resolver::resolve_template(
+				array(
+					'author'    => array( '@id' => '{{post_author_id}}' ),
+					'publisher' => array( '@id' => '{{organization_id}}' ),
+				),
+				$post_id
+			);
+			foreach ( $refs as $key => $ref ) {
+				if ( ! isset( $node[ $key ] ) ) {
+					$node[ $key ] = $ref;
+				}
+			}
 		}
 
 		return $node;

@@ -92,6 +92,47 @@ class Schema_Sanitizer {
 		return preg_match( '/^[A-Z]{3}$/', $code ) ? $code : '';
 	}
 
+	/** schema.org ItemAvailability values Google documents, by short name. */
+	const AVAILABILITY = array( 'InStock', 'OutOfStock', 'PreOrder', 'BackOrder', 'SoldOut', 'LimitedAvailability', 'OnlineOnly', 'InStoreOnly', 'Discontinued', 'PreSale' );
+
+	/**
+	 * A product Offer (Google's Product snippet doc). Accepts the form's
+	 * flat shape ({ price, priceCurrency, availability, priceValidUntil })
+	 * or the stored Offer node, and returns an Offer node, or an empty
+	 * array when there's no usable price (Google requires one, so a
+	 * currency-only offer would just be noise).
+	 */
+	private static function sanitize_offer( array $value ): array {
+		$raw_price = $value['price'] ?? ( $value['priceSpecification']['price'] ?? '' );
+		$price     = is_scalar( $raw_price ) ? str_replace( ',', '', trim( (string) $raw_price ) ) : '';
+		if ( '' === $price || ! is_numeric( $price ) || (float) $price < 0 ) {
+			return array();
+		}
+
+		$offer = array(
+			'@type' => 'Offer',
+			'price' => round( (float) $price, 2 ),
+		);
+
+		$currency = self::sanitize_currency_code( $value['priceCurrency'] ?? '' );
+		if ( $currency ) {
+			$offer['priceCurrency'] = $currency;
+		}
+
+		// Stored as a full schema.org URL; accept the bare name or the URL.
+		$availability = is_string( $value['availability'] ?? null ) ? basename( untrailingslashit( $value['availability'] ) ) : '';
+		if ( in_array( $availability, self::AVAILABILITY, true ) ) {
+			$offer['availability'] = 'https://schema.org/' . $availability;
+		}
+
+		$until = is_string( $value['priceValidUntil'] ?? null ) ? sanitize_text_field( $value['priceValidUntil'] ) : '';
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $until ) ) {
+			$offer['priceValidUntil'] = $until;
+		}
+
+		return $offer;
+	}
+
 	/**
 	 * Accepts the form's shape ({ mode, merchantReturnLink, applicableCountry[],
 	 * returnPolicyCategory, merchantReturnDays, returnFees, returnMethod,
@@ -268,6 +309,9 @@ class Schema_Sanitizer {
 			case 'datetime':
 				return is_string( $value ) ? self::sanitize_datetime( $value ) : '';
 
+			case 'offer':
+				return is_array( $value ) ? self::sanitize_offer( $value ) : array();
+
 			case 'return_policy':
 				return is_array( $value ) ? self::sanitize_return_policy( $value ) : array();
 
@@ -419,12 +463,26 @@ class Schema_Sanitizer {
 			if ( ! empty( $fields[ $key ] ) ) {
 				continue;
 			}
+			// Google needs at least one of a group (Product: offers, review
+			// or aggregateRating). Only warn if none of them is filled.
+			if ( ! empty( $def['one_of'] ) ) {
+				$filled = array_filter( (array) $def['one_of'], static fn( $alt ) => ! empty( $fields[ $alt ] ) );
+				if ( empty( $filled ) ) {
+					$warnings[] = sprintf(
+						/* translators: 1: comma-separated property names, 2: schema type label. */
+						__( "Google requires at least one of %1\$s for %2\$s -- this page won't be rich-result eligible until one is filled in.", 'schema-plugin' ),
+						"'" . implode( "', '", (array) $def['one_of'] ) . "'",
+						$type_label ? $type_label : __( 'this type', 'schema-plugin' )
+					);
+				}
+				continue;
+			}
 			if ( empty( $def['required'] ) ) {
 				// Softer wording for properties Google recommends but doesn't require.
 				if ( ! empty( $def['nudge'] ) ) {
 					$warnings[] = sprintf(
 						/* translators: 1: schema.org property name, 2: schema type label. */
-						__( "Google recommends adding '%1\$s' for %2\$s. Optional, but it helps search engines identify you.", 'schema-plugin' ),
+						__( "Google recommends adding '%1\$s' for %2\$s. Optional, but it helps search engines understand this markup.", 'schema-plugin' ),
 						$key,
 						$type_label ? $type_label : __( 'this type', 'schema-plugin' )
 					);
@@ -481,6 +539,10 @@ class Schema_Sanitizer {
 				return array( __( 'Return policy: enter how many days customers have to return items.', 'schema-plugin' ) );
 			}
 			return array();
+		}
+
+		if ( 'offer' === $type && empty( $value['priceCurrency'] ) ) {
+			return array( __( "Offer: add a currency so Google can read the price. 'priceCurrency' is recommended.", 'schema-plugin' ) );
 		}
 
 		if ( 'shipping_service' === $type ) {

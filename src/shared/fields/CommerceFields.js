@@ -249,3 +249,57 @@ export function ShippingField( { label, value, onChange } ) {
 		</fieldset>
 	);
 }
+
+const AVAILABILITY_OPTIONS = [
+	{ label: __( 'In stock', 'schema-plugin' ), value: 'InStock' },
+	{ label: __( 'Out of stock', 'schema-plugin' ), value: 'OutOfStock' },
+	{ label: __( 'Pre-order', 'schema-plugin' ), value: 'PreOrder' },
+	{ label: __( 'Back-order', 'schema-plugin' ), value: 'BackOrder' },
+	{ label: __( 'Limited availability', 'schema-plugin' ), value: 'LimitedAvailability' },
+	{ label: __( 'Online only', 'schema-plugin' ), value: 'OnlineOnly' },
+	{ label: __( 'In store only', 'schema-plugin' ), value: 'InStoreOnly' },
+	{ label: __( 'Sold out', 'schema-plugin' ), value: 'SoldOut' },
+	{ label: __( 'Discontinued', 'schema-plugin' ), value: 'Discontinued' },
+];
+
+/**
+ * A product Offer (Google's Product snippet doc, updated 2026-09-08):
+ * price is required; currency, availability and "price valid until" are
+ * recommended. Holds the flat form shape; the sanitizer accepts it or the
+ * stored Offer node (availability stored as a schema.org URL).
+ */
+export function OfferField( { label, value, onChange } ) {
+	const offer = value && 'object' === typeof value ? value : {};
+	const set = ( patch ) => onChange( { ...offer, ...patch } );
+	const availability = String( offer.availability || '' ).split( '/' ).pop();
+
+	return (
+		<fieldset className="schema-field schema-field-offer">
+			<legend>{ label }</legend>
+			<TextControl
+				type="number"
+				min={ 0 }
+				step="0.01"
+				label={ __( 'Price', 'schema-plugin' ) }
+				value={ offer.price ?? '' }
+				onChange={ ( price ) => set( { price } ) }
+			/>
+			<CurrencySelect
+				value={ offer.priceCurrency || bootstrap.defaultCurrency || '' }
+				onChange={ ( priceCurrency ) => set( { priceCurrency } ) }
+			/>
+			<SelectField
+				label={ __( 'Availability', 'schema-plugin' ) }
+				value={ availability }
+				options={ AVAILABILITY_OPTIONS }
+				onChange={ ( v ) => set( { availability: v } ) }
+			/>
+			<TextControl
+				type="date"
+				label={ __( 'Price valid until (optional)', 'schema-plugin' ) }
+				value={ offer.priceValidUntil || '' }
+				onChange={ ( priceValidUntil ) => set( { priceValidUntil } ) }
+			/>
+		</fieldset>
+	);
+}

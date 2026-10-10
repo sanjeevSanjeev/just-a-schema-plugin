@@ -2,22 +2,42 @@ import { useState } from '@wordpress/element';
 import { TextControl, TextareaControl, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import TypedField from './fields/TypedField';
-import MediaField from './fields/MediaField';
-import TextareaField from './fields/TextareaField';
-import SameAsBuilder from './fields/SameAsBuilder';
 import LivePreview from './LivePreview';
 import { badgeLabel, resolveBadgeColor } from './EntityForm';
 
 const bootstrap = window.SchemaPluginData || {};
 const fieldDefsConfig = bootstrap.fieldDefs || {};
 const COMMON_TYPES = [ 'Article', 'BlogPosting', 'Product', 'Service', 'CollectionPage', 'WebPage', 'FAQPage', 'HowTo' ];
-const SKIP_KEYS = [ 'headline', 'image', 'name', 'url', 'description', 'sameAs' ];
+// Title-like field first, then the content fields, then the rest in the
+// order PHP defines them.
+const FIELD_ORDER = [ 'name', 'headline', 'description', 'image', 'url', 'datePublished', 'dateModified' ];
 
+const FIELD_LABELS = {
+	name: __( 'Name', 'schema-plugin' ),
+	headline: __( 'Headline', 'schema-plugin' ),
+	description: __( 'Description', 'schema-plugin' ),
+	image: __( 'Image', 'schema-plugin' ),
+	url: __( 'URL', 'schema-plugin' ),
+	datePublished: __( 'Date published', 'schema-plugin' ),
+	dateModified: __( 'Date modified', 'schema-plugin' ),
+	offers: __( 'Price and availability', 'schema-plugin' ),
+};
+
+function orderedFields( defs ) {
+	const rank = ( key ) => {
+		const index = FIELD_ORDER.indexOf( key );
+		return -1 === index ? FIELD_ORDER.length : index;
+	};
+	return Object.entries( defs )
+		.map( ( [ key, def ], position ) => ( { key, def, position } ) )
+		.sort( ( a, b ) => rank( a.key ) - rank( b.key ) || a.position - b.position );
+}
+
+// Per-type field sets come from PHP (Schema_Types::get_block_field_defs());
+// types without their own use the default.
 function getFieldDefsFor( schemaType ) {
-	if ( 'LocalBusiness' === schemaType ) {
-		return { ...fieldDefsConfig.localBusiness };
-	}
-	return { ...fieldDefsConfig.genericBlock };
+	const byType = fieldDefsConfig.block || {};
+	return { ...( byType[ schemaType ] || byType._default || fieldDefsConfig.genericBlock ) };
 }
 
 /**
@@ -77,34 +97,15 @@ export default function PostBlockForm( { block, onChange, postId } ) {
 
 			{ ! usingRaw && (
 				<div className="schema-field-group">
-					<TextControl
-						label={ __( 'Headline / Name', 'schema-plugin' ) }
-						value={ fields.headline || fields.name || '' }
-						onChange={ ( v ) => setField( 'headline', v ) }
-					/>
-					<TextareaField
-						label={ __( 'Description', 'schema-plugin' ) }
-						value={ fields.description }
-						onChange={ ( v ) => setField( 'description', v ) }
-					/>
-					<MediaField
-						label={ __( 'Image', 'schema-plugin' ) }
-						value={ fields.image }
-						onChange={ ( v ) => setField( 'image', v ) }
-					/>
-					<SameAsBuilder value={ fields.sameAs } onChange={ ( v ) => setField( 'sameAs', v ) } />
-
-					{ Object.entries( fieldDefs )
-						.filter( ( [ key ] ) => ! SKIP_KEYS.includes( key ) )
-						.map( ( [ key, def ] ) => (
-							<TypedField
-								key={ key }
-								fieldKey={ key }
-								def={ def }
-								value={ fields[ key ] }
-								onChange={ ( v ) => setField( key, v ) }
-							/>
-						) ) }
+					{ orderedFields( fieldDefs ).map( ( { key, def } ) => (
+						<TypedField
+							key={ key }
+							fieldKey={ key }
+							def={ { ...def, label: def.label || FIELD_LABELS[ key ] } }
+							value={ fields[ key ] }
+							onChange={ ( v ) => setField( key, v ) }
+						/>
+					) ) }
 				</div>
 			) }
 

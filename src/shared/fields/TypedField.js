@@ -11,7 +11,7 @@ import EventLocationField from './EventLocationField';
 import SelectField from './SelectField';
 import TextareaField from './TextareaField';
 import SameAsBuilder from './SameAsBuilder';
-import { ReturnPolicyField, ShippingField } from './CommerceFields';
+import { OfferField, ReturnPolicyField, ShippingField } from './CommerceFields';
 import {
 	AddressField,
 	LatLongField,
@@ -77,6 +77,9 @@ export default function TypedField( { fieldKey, def, value, onChange } ) {
 
 		case 'event_location':
 			return <EventLocationField value={ value } onChange={ onChange } required={ required } />;
+
+		case 'offer':
+			return <OfferField label={ label } value={ value } onChange={ onChange } />;
 
 		case 'return_policy':
 			return <ReturnPolicyField label={ label } value={ value } onChange={ onChange } />;
