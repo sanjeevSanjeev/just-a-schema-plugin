@@ -9,6 +9,13 @@
  * Schema_Linked_Entity_Types, verified 2026-09 in Phase 5), and lists
  * concrete issues that stop an entry being useful.
  *
+ * Pages with a customized schema block (post meta) are scored too, as a
+ * "Customized pages" group, against the verified per-type field sets
+ * (Schema_Types::get_field_defs(): Article, Product, LocalBusiness...).
+ * Pages on the site default aren't scored, and neither are pages using a
+ * raw JSON-LD override (there's no field set to score against); those are
+ * counted in the group note.
+ *
  * Scoring reads the node exactly as it is emitted (defaults, Network
  * Identity and auto-linked profile data included), not the raw form
  * input, so the score describes what search engines actually receive.
@@ -44,6 +51,9 @@ class Schema_Completeness {
 		'local_business' => array( 'url' ),
 	);
 
+	/** Most customized pages scored per report; the rest are counted in the note. */
+	const MAX_PAGES = 50;
+
 	public static function get_report(): array {
 		$entity = self::score_entity();
 
@@ -65,6 +75,14 @@ class Schema_Completeness {
 					: '',
 				'items'       => $items,
 			);
+		}
+
+		$pages = self::score_pages();
+		if ( $pages ) {
+			foreach ( $pages['items'] as $item ) {
+				$all_scores[] = $item['score'];
+			}
+			$groups[] = $pages;
 		}
 
 		// The sitewide entity counts as much as all linked entries together.
@@ -148,13 +166,120 @@ class Schema_Completeness {
 	}
 
 	/**
+	 * The "Customized pages" group, or null when no page has a customized
+	 * block. One query for posts with the meta key, capped at MAX_PAGES.
+	 */
+	private static function score_pages(): ?array {
+		$query = new WP_Query(
+			array(
+				'post_type'              => 'any',
+				'post_status'            => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+				'meta_key'               => Schema_Post_Meta::META_KEY, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_compare'           => 'EXISTS',
+				'posts_per_page'         => self::MAX_PAGES,
+				'orderby'                => 'modified',
+				'order'                  => 'DESC',
+				'fields'                 => 'ids',
+				'update_post_term_cache' => false,
+			)
+		);
+		if ( ! $query->posts ) {
+			return null;
+		}
+
+		$items = array();
+		$raw   = 0;
+		foreach ( $query->posts as $post_id ) {
+			$blocks = Schema_Post_Meta::get_blocks( $post_id );
+			if ( empty( $blocks ) ) {
+				continue;
+			}
+			if ( ! empty( $blocks[0]['raw_override'] ) ) {
+				++$raw;
+				continue;
+			}
+			$items[] = self::score_page( (int) $post_id, (string) ( $blocks[0]['schema_type'] ?? 'WebPage' ) );
+		}
+
+		$notes = array();
+		if ( $raw ) {
+			$notes[] = sprintf(
+				/* translators: %d: number of pages. */
+				_n( '%d page uses a raw JSON-LD override and is not scored.', '%d pages use a raw JSON-LD override and are not scored.', $raw, 'schema-plugin' ),
+				$raw
+			);
+		}
+		if ( $query->found_posts > self::MAX_PAGES ) {
+			$notes[] = sprintf(
+				/* translators: %d: number of pages shown. */
+				__( 'Showing the %d most recently edited customized pages.', 'schema-plugin' ),
+				self::MAX_PAGES
+			);
+		}
+
+		if ( ! $items && ! $raw ) {
+			return null;
+		}
+
+		return array(
+			'entity_type' => 'page_block',
+			'label'       => __( 'Customized pages', 'schema-plugin' ),
+			'edit_url'    => '',
+			'note'        => implode( ' ', $notes ),
+			'items'       => $items,
+		);
+	}
+
+	private static function score_page( int $post_id, string $schema_type ): array {
+		$node   = Schema_Post_Meta::get_explicit_block( $post_id ) ?? array();
+		$defs   = Schema_Types::get_field_defs( $schema_type );
+		// The entity labels ("Photo", "Logo") don't fit a page's fields.
+		foreach ( self::block_labels() as $key => $label ) {
+			if ( isset( $defs[ $key ] ) && empty( $defs[ $key ]['label'] ) ) {
+				$defs[ $key ]['label'] = $label;
+			}
+		}
+		$scored = self::score_node( $node, $defs );
+		$issues = self::field_issues( $node, $defs );
+
+		if ( 'publish' !== get_post_status( $post_id ) ) {
+			$issues[] = self::issue( __( "This page isn't published yet, so its schema isn't live.", 'schema-plugin' ), 'warning' );
+		}
+
+		$title = get_the_title( $post_id );
+		return array_merge(
+			$scored,
+			array(
+				'id'       => (string) $post_id,
+				'name'     => '' !== $title ? sprintf( '%1$s (%2$s)', $title, $schema_type ) : sprintf( '%s (%s)', __( '(untitled)', 'schema-plugin' ), $schema_type ),
+				'issues'   => $issues,
+				'edit_url' => (string) get_edit_post_link( $post_id, 'raw' ),
+			)
+		);
+	}
+
+	/** @return array<string, string> */
+	private static function block_labels(): array {
+		return array(
+			'headline'      => __( 'Headline', 'schema-plugin' ),
+			'image'         => __( 'Image', 'schema-plugin' ),
+			'datePublished' => __( 'Date published', 'schema-plugin' ),
+			'dateModified'  => __( 'Date modified', 'schema-plugin' ),
+			'offers'        => __( 'Price and availability (or a review or rating)', 'schema-plugin' ),
+		);
+	}
+
+	/**
 	 * @return array{score:int, missing_required:string[], missing_recommended:string[]}
 	 */
 	private static function score_node( array $node, array $defs ): array {
 		$required    = array();
 		$recommended = array();
 		foreach ( $defs as $key => $def ) {
-			if ( ! empty( $def['required'] ) ) {
+			if ( ! empty( $def['one_of'] ) ) {
+				// Required as a group (Product: offers, review or aggregateRating).
+				$required[ $key ] = (bool) array_filter( (array) $def['one_of'], static fn( $alt ) => self::is_filled( $node[ $alt ] ?? null ) );
+			} elseif ( ! empty( $def['required'] ) ) {
 				$required[ $key ] = self::is_filled( $node[ $key ] ?? null );
 			} elseif ( ! empty( $def['recommended'] ) ) {
 				$recommended[ $key ] = self::is_filled( $node[ $key ] ?? null );

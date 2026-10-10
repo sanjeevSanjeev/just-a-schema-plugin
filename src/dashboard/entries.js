@@ -25,7 +25,7 @@ export function entriesFrom( report ) {
 				...item,
 				key: `${ group.entity_type }-${ item.id }`,
 				group: group.label,
-				editUrl: group.edit_url,
+				editUrl: item.edit_url || group.edit_url,
 			} );
 		} );
 	} );
