@@ -465,11 +465,20 @@ class Schema_Types {
 			'url'         => '{{permalink}}',
 			'provider'    => array( '@id' => '{{organization_id}}' ),
 		),
+		// offers comes from WooCommerce (see Schema_Token_Resolver); with it
+		// off, or on a non-product, the Offer resolves to nothing and is
+		// dropped. Google requires one of offers/review/aggregateRating.
 		'Product'        => array(
 			'name'        => '{{post_title}}',
 			'description' => '{{post_excerpt}}',
 			'image'       => '{{featured_image}}',
 			'url'         => '{{permalink}}',
+			'offers'      => array(
+				'@type'         => 'Offer',
+				'price'         => '{{product_price}}',
+				'priceCurrency' => '{{product_currency}}',
+				'availability'  => '{{product_availability}}',
+			),
 		),
 		'CollectionPage' => array(
 			'name'        => '{{post_title}}',

@@ -5,7 +5,10 @@
  * Token resolution for Default Rules templates -- CLAUDE.md Section 3.4.
  * Supports: {{post_title}}, {{post_excerpt}}, {{featured_image}},
  * {{post_author_id}}, {{post_date}}, {{post_modified}}, {{permalink}},
- * {{organization_id}}, plus {{homepage_id}} used in match.value.
+ * {{organization_id}}, plus {{homepage_id}} used in match.value, and the
+ * WooCommerce-only {{product_price}}, {{product_currency}} and
+ * {{product_availability}} (empty when WooCommerce is off or the post isn't
+ * a product, so a template using them just omits the property).
  *
  * @package Schema_Plugin
  */
@@ -69,6 +72,17 @@ class Schema_Token_Resolver {
 				$permalink = get_permalink( $post_id );
 				return $permalink ? $permalink : '';
 
+			case 'product_price':
+				return self::get_product_value( $post_id, 'price' );
+
+			case 'product_currency':
+				return $post_id > 0 && function_exists( 'get_woocommerce_currency' ) && self::get_wc_product( $post_id )
+					? (string) get_woocommerce_currency()
+					: '';
+
+			case 'product_availability':
+				return self::get_product_value( $post_id, 'availability' );
+
 			case 'organization_id':
 				return class_exists( 'Schema_Entity_Registry' ) ? Schema_Entity_Registry::get_entity_id_uri() : '';
 
@@ -85,6 +99,59 @@ class Schema_Token_Resolver {
 			return (int) get_option( 'page_on_front' );
 		}
 		return 0;
+	}
+
+	/**
+	 * The WooCommerce product for a post, or null (WooCommerce off, or the
+	 * post isn't a product).
+	 *
+	 * @param int $post_id Post ID.
+	 * @return object|null
+	 */
+	private static function get_wc_product( int $post_id ) {
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return null;
+		}
+		$product = wc_get_product( $post_id );
+		return $product ? $product : null;
+	}
+
+	/**
+	 * A product's displayed price (honouring the store's tax display
+	 * setting) or its schema.org availability URL; '' when unavailable.
+	 *
+	 * @param int    $post_id Post ID.
+	 * @param string $what    'price' or 'availability'.
+	 * @return string
+	 */
+	private static function get_product_value( int $post_id, string $what ): string {
+		$product = self::get_wc_product( $post_id );
+		if ( ! $product ) {
+			return '';
+		}
+
+		if ( 'availability' === $what ) {
+			$map    = array(
+				'instock'     => 'InStock',
+				'outofstock'  => 'OutOfStock',
+				'onbackorder' => 'BackOrder',
+			);
+			$status = (string) $product->get_stock_status();
+			return isset( $map[ $status ] ) ? 'https://schema.org/' . $map[ $status ] : '';
+		}
+
+		// A product with no price set must not read as free: the display
+		// helper turns an empty price into 0.
+		if ( '' === (string) $product->get_price() ) {
+			return '';
+		}
+		$price = function_exists( 'wc_get_price_to_display' ) ? wc_get_price_to_display( $product ) : $product->get_price();
+		if ( '' === (string) $price || ! is_numeric( $price ) ) {
+			return '';
+		}
+		return function_exists( 'wc_format_decimal' ) && function_exists( 'wc_get_price_decimals' )
+			? (string) wc_format_decimal( $price, wc_get_price_decimals() )
+			: (string) $price;
 	}
 
 	public static function resolve_string( string $value, int $post_id ): string {
@@ -109,6 +176,16 @@ class Schema_Token_Resolver {
 		foreach ( $template as $key => $value ) {
 			if ( is_array( $value ) ) {
 				$child = self::resolve_template( $value, $post_id );
+				// A typed node left with nothing but its @type (an Offer whose
+				// price didn't resolve) is dropped; a bare @id reference stays.
+				if ( isset( $child['@type'] ) && array() === array_diff( array_keys( $child ), array( '@type', '@id', '@context' ) ) ) {
+					continue;
+				}
+				// Google requires a price on an Offer, so one without it is
+				// dropped rather than emitted half-empty.
+				if ( 'Offer' === ( $child['@type'] ?? '' ) && ! isset( $child['price'] ) && ! isset( $child['priceSpecification'] ) ) {
+					continue;
+				}
 				if ( ! empty( $child ) ) {
 					$resolved[ $key ] = $child;
 				}

@@ -18,6 +18,18 @@ class Schema_Default_Rules {
 
 	const OPTION = 'schema_plugin_default_rules';
 
+	/** Bumped when stock templates change; see maybe_upgrade_templates(). */
+	const VERSION_OPTION  = 'schema_plugin_default_rules_version';
+	const CURRENT_VERSION = 2;
+
+	/** The Product template shipped before offers existed (version 1). */
+	const LEGACY_PRODUCT_TEMPLATE = array(
+		'name'        => '{{post_title}}',
+		'description' => '{{post_excerpt}}',
+		'image'       => '{{featured_image}}',
+		'url'         => '{{permalink}}',
+	);
+
 	public static function get_rules(): array {
 		$rules = get_option( self::OPTION, array() );
 		if ( ! is_array( $rules ) || empty( $rules ) ) {
@@ -31,6 +43,30 @@ class Schema_Default_Rules {
 				),
 			);
 		}
+		return self::maybe_upgrade_templates( $rules );
+	}
+
+	/**
+	 * One-time: stored Product rules whose template is exactly the old stock
+	 * one get the offers property. Customized templates are never touched.
+	 * Without WooCommerce the new property resolves to nothing, so output is
+	 * unchanged.
+	 *
+	 * @param array $rules Stored rules.
+	 * @return array
+	 */
+	private static function maybe_upgrade_templates( array $rules ): array {
+		if ( (int) get_option( self::VERSION_OPTION, 1 ) >= self::CURRENT_VERSION ) {
+			return $rules;
+		}
+
+		foreach ( $rules as $index => $rule ) {
+			if ( 'Product' === ( $rule['schema_type'] ?? '' ) && ( $rule['template'] ?? null ) === self::LEGACY_PRODUCT_TEMPLATE ) {
+				$rules[ $index ]['template'] = Schema_Types::TEMPLATE_BY_SCHEMA_TYPE['Product'];
+			}
+		}
+		update_option( self::OPTION, $rules );
+		update_option( self::VERSION_OPTION, self::CURRENT_VERSION );
 		return $rules;
 	}
 
