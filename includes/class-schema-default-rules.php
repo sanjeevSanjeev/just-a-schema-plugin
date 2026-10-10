@@ -87,7 +87,8 @@ class Schema_Default_Rules {
 		// resolves empty. Identify the node by the request URL instead of
 		// emitting a bare type.
 		if ( $post_id <= 0 && 'WebPage' === $node['@type'] ) {
-			$request_url = esc_url_raw( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ) );
+			$request_path = esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) );
+			$request_url  = esc_url_raw( home_url( $request_path ) );
 			if ( empty( $node['url'] ) ) {
 				$node['url'] = $request_url;
 			}

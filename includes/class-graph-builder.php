@@ -67,6 +67,11 @@ class Schema_Graph_Builder {
 		return $memo;
 	}
 
+	/**
+	 * Builds the graph for the current request, or null when excluded.
+	 *
+	 * @return array|null
+	 */
 	private static function build_graph(): ?array {
 		if ( self::is_system_excluded() ) {
 			return null;

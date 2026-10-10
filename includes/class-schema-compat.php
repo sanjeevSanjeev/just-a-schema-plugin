@@ -18,6 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Switches off other SEO plugins' schema when this plugin prints its own.
+ */
 class Schema_Compat {
 
 	const OPTION = 'schema_plugin_compat_mode';
@@ -25,6 +28,9 @@ class Schema_Compat {
 	const MODE_REPLACE = 'replace';
 	const MODE_BOTH    = 'both';
 
+	/**
+	 * Hooks the suppression filters unless the mode is "both".
+	 */
 	public static function init(): void {
 		if ( self::MODE_REPLACE !== self::get_mode() ) {
 			return;
@@ -35,12 +41,19 @@ class Schema_Compat {
 		add_filter( 'rank_math/json_ld', array( __CLASS__, 'filter_rank_math' ), 99 );
 	}
 
+	/**
+	 * The saved mode, defaulting to "replace".
+	 *
+	 * @return string
+	 */
 	public static function get_mode(): string {
 		$mode = get_option( self::OPTION, self::MODE_REPLACE );
 		return self::MODE_BOTH === $mode ? self::MODE_BOTH : self::MODE_REPLACE;
 	}
 
 	/**
+	 * Turns Yoast's JSON-LD off when this plugin is printing a graph.
+	 *
 	 * @param mixed $output Yoast's current value.
 	 * @return mixed
 	 */
@@ -49,6 +62,8 @@ class Schema_Compat {
 	}
 
 	/**
+	 * Empties Rank Math's JSON-LD when this plugin is printing a graph.
+	 *
 	 * @param mixed $data Rank Math's JSON-LD data.
 	 * @return mixed
 	 */
@@ -102,10 +117,20 @@ class Schema_Compat {
 		);
 	}
 
+	/**
+	 * Saves the mode; anything other than "both" means "replace".
+	 *
+	 * @param string $mode Requested mode.
+	 */
 	public static function set_mode( string $mode ): void {
 		update_option( self::OPTION, self::MODE_BOTH === $mode ? self::MODE_BOTH : self::MODE_REPLACE );
 	}
 
+	/**
+	 * Whether this plugin prints a graph on the current request.
+	 *
+	 * @return bool
+	 */
 	private static function we_are_printing(): bool {
 		$graph = Schema_Graph_Builder::build_for_current_request();
 		return ! empty( $graph );

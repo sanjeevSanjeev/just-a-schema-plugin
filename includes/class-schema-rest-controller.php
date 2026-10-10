@@ -504,10 +504,21 @@ class Schema_Rest_Controller {
 
 	// -- /compat ----------------------------------------------------------------
 
+	/**
+	 * Current mode and detected plugins.
+	 *
+	 * @return WP_REST_Response
+	 */
 	public static function get_compat(): WP_REST_Response {
 		return new WP_REST_Response( Schema_Compat::get_status() );
 	}
 
+	/**
+	 * Saves the mode.
+	 *
+	 * @param WP_REST_Request $request Request with a `mode` param.
+	 * @return WP_REST_Response
+	 */
 	public static function save_compat( WP_REST_Request $request ): WP_REST_Response {
 		Schema_Compat::set_mode( sanitize_key( (string) $request->get_param( 'mode' ) ) );
 		return self::get_compat();

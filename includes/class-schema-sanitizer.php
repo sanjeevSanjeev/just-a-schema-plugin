@@ -92,7 +92,7 @@ class Schema_Sanitizer {
 		return preg_match( '/^[A-Z]{3}$/', $code ) ? $code : '';
 	}
 
-	/** schema.org ItemAvailability values Google documents, by short name. */
+	/** Schema.org ItemAvailability values Google documents, by short name. */
 	const AVAILABILITY = array( 'InStock', 'OutOfStock', 'PreOrder', 'BackOrder', 'SoldOut', 'LimitedAvailability', 'OnlineOnly', 'InStoreOnly', 'Discontinued', 'PreSale' );
 
 	/**
@@ -101,6 +101,9 @@ class Schema_Sanitizer {
 	 * or the stored Offer node, and returns an Offer node, or an empty
 	 * array when there's no usable price (Google requires one, so a
 	 * currency-only offer would just be noise).
+	 *
+	 * @param array $value Raw offer value.
+	 * @return array
 	 */
 	private static function sanitize_offer( array $value ): array {
 		$raw_price = $value['price'] ?? ( $value['priceSpecification']['price'] ?? '' );

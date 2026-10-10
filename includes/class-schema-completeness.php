@@ -230,9 +230,16 @@ class Schema_Completeness {
 		);
 	}
 
+	/**
+	 * Scores one page's customized block.
+	 *
+	 * @param int    $post_id     Post ID.
+	 * @param string $schema_type The block's schema.org type.
+	 * @return array
+	 */
 	private static function score_page( int $post_id, string $schema_type ): array {
-		$node   = Schema_Post_Meta::get_explicit_block( $post_id ) ?? array();
-		$defs   = Schema_Types::get_field_defs( $schema_type );
+		$node = Schema_Post_Meta::get_explicit_block( $post_id ) ?? array();
+		$defs = Schema_Types::get_field_defs( $schema_type );
 		// The entity labels ("Photo", "Logo") don't fit a page's fields.
 		foreach ( self::block_labels() as $key => $label ) {
 			if ( isset( $defs[ $key ] ) && empty( $defs[ $key ]['label'] ) ) {
@@ -258,7 +265,11 @@ class Schema_Completeness {
 		);
 	}
 
-	/** @return array<string, string> */
+	/**
+	 * Page-specific labels for the fields a page block scores.
+	 *
+	 * @return array<string, string>
+	 */
 	private static function block_labels(): array {
 		return array(
 			'headline'      => __( 'Headline', 'schema-plugin' ),

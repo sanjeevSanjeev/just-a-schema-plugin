@@ -59,6 +59,11 @@ class Schema_Post_Meta {
 	 * references (the same ones the default rule uses) unless the block
 	 * sets them. Without this, customizing a post's Article would silently
 	 * drop both, which Google recommends for articles.
+	 *
+	 * @param int    $post_id     Post ID (0 for none).
+	 * @param string $schema_type The block's schema.org type.
+	 * @param array  $fields      Sanitized field values.
+	 * @return array
 	 */
 	public static function build_block_node( int $post_id, string $schema_type, array $fields ): array {
 		$node      = array( '@type' => $schema_type );
