@@ -37,8 +37,9 @@ class Schema_Compat {
 		}
 		// Yoast: returning false from this filter skips its JSON-LD output.
 		add_filter( 'wpseo_json_ld_output', array( __CLASS__, 'filter_yoast' ), 99 );
-		// Rank Math: an empty data array prints nothing.
-		add_filter( 'rank_math/json_ld', array( __CLASS__, 'filter_rank_math' ), 99 );
+		// Rank Math prints nothing when this filter's result is empty. Rank
+		// Math's own handlers run up to priority 99, so this runs after them.
+		add_filter( 'rank_math/json_ld', array( __CLASS__, 'filter_rank_math' ), 9999 );
 	}
 
 	/**
