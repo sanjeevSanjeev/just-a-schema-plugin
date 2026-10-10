@@ -108,6 +108,10 @@ class Schema_Entity_Registry {
 		if ( empty( $fields['inLanguage'] ) ) {
 			$fields['inLanguage'] = get_locale();
 		}
+		// schema.org expects BCP 47 ("en-US"), not WordPress's "en_US".
+		if ( is_string( $fields['inLanguage'] ) ) {
+			$fields['inLanguage'] = str_replace( '_', '-', $fields['inLanguage'] );
+		}
 
 		$node = array(
 			'@type' => $resolved_type,

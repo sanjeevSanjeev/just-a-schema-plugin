@@ -81,7 +81,28 @@ class Schema_Default_Rules {
 			}
 		}
 
-		return array_merge( $node, $resolved );
+		$node = array_merge( $node, $resolved );
+
+		// Blog index and archives have no single post, so every post token
+		// resolves empty. Identify the node by the request URL instead of
+		// emitting a bare type.
+		if ( $post_id <= 0 && 'WebPage' === $node['@type'] ) {
+			$request_url = esc_url_raw( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ) );
+			if ( empty( $node['url'] ) ) {
+				$node['url'] = $request_url;
+			}
+			if ( empty( $node['@id'] ) ) {
+				$node['@id'] = trailingslashit( strtok( $request_url, '?#' ) ) . '#webpage';
+			}
+			if ( empty( $node['name'] ) ) {
+				$title = html_entity_decode( wp_get_document_title(), ENT_QUOTES, 'UTF-8' );
+				if ( '' !== $title ) {
+					$node['name'] = $title;
+				}
+			}
+		}
+
+		return $node;
 	}
 
 	private static function rule_matches( array $rule, int $post_id ): bool {
