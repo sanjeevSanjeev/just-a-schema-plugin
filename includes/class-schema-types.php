@@ -422,12 +422,18 @@ class Schema_Types {
 	 * required, and so is one of offers, review or aggregateRating. Only
 	 * `offers` is editable here (`one_of` lists the alternatives the raw
 	 * JSON-LD can supply instead). An Offer requires `price`; priceCurrency,
-	 * availability and priceValidUntil are recommended.
+	 * availability and priceValidUntil are recommended. `image` is only
+	 * recommended here: Product snippets don't need it, but Google's
+	 * merchant-listing doc (checked 2026-10-10) requires name, image and
+	 * offers, and a Rich Results Test of a product without one came back
+	 * invalid for merchant listings.
 	 */
 	const PRODUCT_BLOCK_FIELDS = array(
 		'image'  => array(
-			'required' => false,
-			'type'     => 'media',
+			'required'    => false,
+			'recommended' => true,
+			'nudge'       => true,
+			'type'        => 'media',
 		),
 		'offers' => array(
 			'required' => false,
