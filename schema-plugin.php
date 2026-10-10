@@ -35,6 +35,7 @@ spl_autoload_register(
 			'Schema_Activation'                    => 'class-schema-activation.php',
 			'Schema_Admin'                         => 'class-schema-admin.php',
 			'Schema_Author_Profile'                => 'class-schema-author-profile.php',
+			'Schema_Compat'                        => 'class-schema-compat.php',
 			'Schema_Completeness'                  => 'class-schema-completeness.php',
 			'Schema_Dashboard'                     => 'class-schema-dashboard.php',
 			'Schema_Default_Rules'                 => 'class-schema-default-rules.php',
@@ -79,6 +80,7 @@ function schema_plugin_bootstrap(): void {
 	Schema_Features::maybe_upgrade();
 
 	Schema_Graph_Builder::init();
+	Schema_Compat::init();
 
 	// Class-string callables: the controllers only load when REST runs.
 	add_action( 'rest_api_init', array( 'Schema_Rest_Controller', 'register_routes' ) );

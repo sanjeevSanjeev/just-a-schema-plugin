@@ -297,6 +297,7 @@ class Schema_Admin {
 			'featuresUrl'            => self::page_url( self::PAGE_SETTINGS, 'features' ),
 			'wizardUrl'              => self::page_url( self::PAGE_WIZARD ),
 			'features'               => Schema_Features::get_status(),
+			'compat'                 => Schema_Compat::get_status(),
 			'featureSuggestions'     => array_combine(
 				array_keys( Schema_Types::get_locked_types() ),
 				array_map( array( 'Schema_Features', 'get_suggested' ), array_keys( Schema_Types::get_locked_types() ) )

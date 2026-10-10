@@ -137,6 +137,23 @@ class Schema_Rest_Controller {
 			)
 		);
 
+		register_rest_route(
+			self::NAMESPACE_V1,
+			'/compat',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( __CLASS__, 'get_compat' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_options' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( __CLASS__, 'save_compat' ),
+					'permission_callback' => array( __CLASS__, 'can_manage_options' ),
+				),
+			)
+		);
+
 		// Only registered while the Network identity feature is on.
 		if ( Schema_Features::is_enabled( 'network' ) ) {
 			register_rest_route(
@@ -486,6 +503,17 @@ class Schema_Rest_Controller {
 	public static function save_features( WP_REST_Request $request ): WP_REST_Response {
 		Schema_Features::set_enabled( (array) $request->get_param( 'enabled' ) );
 		return self::get_features();
+	}
+
+	// -- /compat ----------------------------------------------------------------
+
+	public static function get_compat(): WP_REST_Response {
+		return new WP_REST_Response( Schema_Compat::get_status() );
+	}
+
+	public static function save_compat( WP_REST_Request $request ): WP_REST_Response {
+		Schema_Compat::set_mode( sanitize_key( (string) $request->get_param( 'mode' ) ) );
+		return self::get_compat();
 	}
 
 	// -- /network-identity ----------------------------------------------------

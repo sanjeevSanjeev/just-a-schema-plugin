@@ -145,3 +145,7 @@ export function getCompleteness() {
 export function saveFeatures( enabled ) {
 	return apiFetch( { path: `${ NAMESPACE }/features`, method: 'POST', data: { enabled } } );
 }
+
+export function saveCompatMode( mode ) {
+	return apiFetch( { path: `${ NAMESPACE }/compat`, method: 'POST', data: { mode } } );
+}

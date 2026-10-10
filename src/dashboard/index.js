@@ -5,6 +5,7 @@ import Tiles from './Tiles';
 import AttentionPanel from './AttentionPanel';
 import NextStep from './NextStep';
 import HealthDetails from './HealthDetails';
+import CompatNotice from './CompatNotice';
 import { alertsFrom } from './entries';
 import { getDashboardStatus, getCompleteness } from '../shared/api';
 import '../shared/style.scss';
@@ -90,6 +91,8 @@ function DashboardApp() {
 					<span className="screen-reader-text">{ __( '(re-runs the setup wizard)', 'schema-plugin' ) }</span>
 				</a>
 			</header>
+
+			<CompatNotice compat={ status.compat } />
 
 			<Tiles report={ report } status={ status } alerts={ alerts } />
 

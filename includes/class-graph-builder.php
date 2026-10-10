@@ -55,7 +55,19 @@ class Schema_Graph_Builder {
 		wp_print_inline_script_tag( $json, array( 'type' => 'application/ld+json' ) );
 	}
 
+	/**
+	 * Built once per request: wp_head output and the SEO-plugin
+	 * suppression check (Schema_Compat) both need the same graph.
+	 */
 	public static function build_for_current_request(): ?array {
+		static $memo = false;
+		if ( false === $memo ) {
+			$memo = self::build_graph();
+		}
+		return $memo;
+	}
+
+	private static function build_graph(): ?array {
 		if ( self::is_system_excluded() ) {
 			return null;
 		}

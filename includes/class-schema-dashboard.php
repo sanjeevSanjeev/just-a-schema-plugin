@@ -37,6 +37,7 @@ class Schema_Dashboard {
 			'exclusion_count'   => count( $exclusions ),
 			'search_enabled'    => Schema_Entity_Registry::get_website_search_enabled(),
 			'recommendations'   => self::get_recommendations( $entity_type ),
+			'compat'            => Schema_Compat::get_status(),
 		);
 	}
 

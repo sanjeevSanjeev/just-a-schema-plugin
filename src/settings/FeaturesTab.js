@@ -1,9 +1,88 @@
 import { useState } from '@wordpress/element';
-import { Button, Notice, ToggleControl } from '@wordpress/components';
+import { Button, Notice, RadioControl, ToggleControl } from '@wordpress/components';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { saveFeatures } from '../shared/api';
+import { saveFeatures, saveCompatMode } from '../shared/api';
 
 const bootstrap = window.SchemaPluginData || {};
+
+/**
+ * "Other plugins that print structured data" section: shown only when Yoast,
+ * Rank Math or WooCommerce is active. The mode saves on its own, immediately,
+ * since it isn't part of the features list.
+ */
+function CompatSection() {
+	const compat = bootstrap.compat || { mode: 'replace', plugins: [] };
+	const [ mode, setMode ] = useState( compat.mode );
+	const [ error, setError ] = useState( '' );
+	const [ saved, setSaved ] = useState( false );
+	const seo = compat.plugins.filter( ( p ) => 'woocommerce' !== p.key );
+	const woo = compat.plugins.some( ( p ) => 'woocommerce' === p.key );
+
+	if ( ! compat.plugins.length ) {
+		return null;
+	}
+
+	const change = ( next ) => {
+		const previous = mode;
+		setMode( next );
+		setSaved( false );
+		setError( '' );
+		saveCompatMode( next )
+			.then( () => setSaved( true ) )
+			.catch( ( err ) => {
+				setMode( previous );
+				setError( err.message || __( 'Something went wrong.', 'schema-plugin' ) );
+			} );
+	};
+
+	return (
+		<div className="schema-field-group schema-compat-section">
+			<h3>{ __( 'Other plugins that print structured data', 'schema-plugin' ) }</h3>
+			<p>
+				{ sprintf(
+					/* translators: %s: plugin names. */
+					__( 'Active on this site: %s.', 'schema-plugin' ),
+					compat.plugins.map( ( plugin ) => plugin.label ).join( ', ' )
+				) }
+			</p>
+			{ seo.length > 0 && (
+				<RadioControl
+					label={ __( 'When another SEO plugin also prints schema', 'schema-plugin' ) }
+					selected={ mode }
+					options={ [
+						{
+							label: __( "Use this plugin's schema and switch off theirs (recommended)", 'schema-plugin' ),
+							value: 'replace',
+						},
+						{
+							label: __( 'Leave both on (pages may carry two graphs)', 'schema-plugin' ),
+							value: 'both',
+						},
+					] }
+					onChange={ change }
+					help={ __(
+						'Theirs is only switched off on pages where this plugin prints its own, so excluded pages keep their schema.',
+						'schema-plugin'
+					) }
+				/>
+			) }
+			{ woo && (
+				<p>
+					{ __(
+						"WooCommerce adds its own product markup. It isn't switched off, so product pages may carry both.",
+						'schema-plugin'
+					) }
+				</p>
+			) }
+			{ saved && <p role="status">{ __( 'Saved.', 'schema-plugin' ) }</p> }
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+		</div>
+	);
+}
 
 /**
  * Settings → Features: optional features (Schema_Features) as switches,
@@ -110,6 +189,8 @@ export default function FeaturesTab() {
 			<Button variant="primary" onClick={ save } isBusy={ saving } disabled={ saving || ! changed }>
 				{ __( 'Save changes', 'schema-plugin' ) }
 			</Button>
+
+			<CompatSection />
 		</div>
 	);
 }
