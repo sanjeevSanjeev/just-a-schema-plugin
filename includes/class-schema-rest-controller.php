@@ -565,7 +565,7 @@ class Schema_Rest_Controller {
 		return new WP_REST_Response(
 			array(
 				'node'     => $graph,
-				'warnings' => Schema_Network_Identity::validate( $settings ),
+				'warnings' => array_merge( Schema_Network_Identity::validate( $settings ), Schema_Network_Identity::get_warnings( $settings ) ),
 			)
 		);
 	}

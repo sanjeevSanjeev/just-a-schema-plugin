@@ -6,7 +6,9 @@ import LivePreview from '../shared/LivePreview';
 import { getNetworkIdentity, saveNetworkIdentity } from '../shared/api';
 
 /**
- * v1.1 Phase 4 -- Network Identity settings (CLAUDE.md complaint #1).
+ * v1.1 Phase 4 -- Network Identity settings (CLAUDE.md complaint #1). A site
+ * is standalone, a member of a main brand's site, or the main site itself
+ * (lists its member sites).
  * All resolution happens in PHP (Schema_Network_Identity); the preview
  * posts the draft settings to /preview and shows the sitewide nodes
  * exactly as wp_head would render them.
@@ -49,6 +51,12 @@ export default function NetworkTab() {
 	};
 
 	const isMember = 'member' === settings.role;
+	const isParent = 'parent' === settings.role;
+	const memberSites = settings.member_sites || [];
+	const setMember = ( index, patch ) =>
+		set( { member_sites: memberSites.map( ( row, i ) => ( i === index ? { ...row, ...patch } : row ) ) } );
+	const addMember = () => set( { member_sites: [ ...memberSites, { url: '', name: '' } ] } );
+	const removeMember = ( index ) => set( { member_sites: memberSites.filter( ( _, i ) => i !== index ) } );
 	const entityWord = data.entity_is_person ? __( 'person', 'schema-plugin' ) : __( 'organization', 'schema-plugin' );
 	const suggestion = data.suggested_parent_url;
 
@@ -75,10 +83,64 @@ export default function NetworkTab() {
 					options={ [
 						{ label: __( 'It stands on its own', 'schema-plugin' ), value: 'standalone' },
 						{ label: __( "It's part of a main brand's website", 'schema-plugin' ), value: 'member' },
+						{ label: __( 'It is the main brand site, with other sites under it', 'schema-plugin' ), value: 'parent' },
 					] }
 					onChange={ ( role ) => set( { role } ) }
 				/>
 			</div>
+
+			{ isParent && (
+				<div className="schema-field-group schema-network-members">
+					<h3>{ __( 'Sites under this one', 'schema-plugin' ) }</h3>
+					<p className="description">
+						{ __(
+							"List the separate brands or divisions that belong to this site, each by its own address. They're added to your structured data so search engines see the whole group. Each of those sites should be set to \"part of a main brand's website\", pointing back here.",
+							'schema-plugin'
+						) }
+					</p>
+					{ data.entity_is_person && (
+						<Notice status="warning" isDismissible={ false }>
+							{ __(
+								"A person can't have sub-organizations, so nothing will be listed. Change the site type to an organization to use this.",
+								'schema-plugin'
+							) }
+						</Notice>
+					) }
+					{ memberSites.map( ( row, index ) => (
+						<div className="schema-network-member-row" key={ index }>
+							<UrlField
+								label={ sprintf(
+									/* translators: %d: row number. */
+									__( 'Site %d address', 'schema-plugin' ),
+									index + 1
+								) }
+								value={ row.url }
+								onChange={ ( url ) => setMember( index, { url } ) }
+								required
+							/>
+							<TextControl
+								label={ sprintf(
+									/* translators: %d: row number. */
+									__( 'Site %d name (optional)', 'schema-plugin' ),
+									index + 1
+								) }
+								value={ row.name || '' }
+								onChange={ ( name ) => setMember( index, { name } ) }
+							/>
+							<Button variant="link" isDestructive onClick={ () => removeMember( index ) }>
+								{ sprintf(
+									/* translators: %d: row number. */
+									__( 'Remove site %d', 'schema-plugin' ),
+									index + 1
+								) }
+							</Button>
+						</div>
+					) ) }
+					<Button variant="secondary" onClick={ addMember }>
+						{ __( 'Add a site', 'schema-plugin' ) }
+					</Button>
+				</div>
+			) }
 
 			{ isMember && (
 				<>

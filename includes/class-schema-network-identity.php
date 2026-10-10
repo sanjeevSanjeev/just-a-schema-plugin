@@ -17,13 +17,17 @@
  *
  * Either way, the WebSite node gains isPartOf -> the parent's WebSite.
  *
+ * The main site can also say it has members (role 'parent'): it lists the
+ * member sites' addresses and its entity gains subOrganization, one
+ * Organization per member with the @id that member uses for itself
+ * ("{its address}/#organization"). Only an Organization can have
+ * sub-organizations, so a Person site lists none.
+ *
  * Parent @ids default to "{parent_url}/#organization|#person" and
  * "{parent_url}/#website" (the convention used by this plugin, Yoast and
  * Rank Math), with overrides for parents that use something else. Works
  * the same for separate installs and multisite subsites; nothing is read
  * from the parent site at runtime.
- *
- * TODO(v1.1): a "parent" role that lists member sites as subOrganization.
  *
  * @package Schema_Plugin
  */
@@ -35,6 +39,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Schema_Network_Identity {
 
 	const OPTION = 'schema_plugin_network_identity';
+
+	/** Most member sites one parent can list. */
+	const MAX_MEMBER_SITES = 50;
 
 	/**
 	 * Draft settings used by /preview in place of the saved ones.
@@ -51,6 +58,7 @@ class Schema_Network_Identity {
 			'parent_name'       => '',
 			'parent_entity_id'  => '',
 			'parent_website_id' => '',
+			'member_sites'      => array(),
 		);
 	}
 
@@ -84,7 +92,7 @@ class Schema_Network_Identity {
 	public static function sanitize( array $raw ): array {
 		$clean = self::defaults();
 
-		$clean['role']         = in_array( $raw['role'] ?? '', array( 'standalone', 'member' ), true ) ? $raw['role'] : 'standalone';
+		$clean['role']         = in_array( $raw['role'] ?? '', array( 'standalone', 'member', 'parent' ), true ) ? $raw['role'] : 'standalone';
 		$clean['relationship'] = in_array( $raw['relationship'] ?? '', array( 'same', 'sub' ), true ) ? $raw['relationship'] : 'same';
 		$clean['parent_name']  = sanitize_text_field( (string) ( $raw['parent_name'] ?? '' ) );
 
@@ -96,7 +104,45 @@ class Schema_Network_Identity {
 			$clean[ $key ] = filter_var( $value, FILTER_VALIDATE_URL ) ? esc_url_raw( $value ) : $value;
 		}
 
+		$clean['member_sites'] = self::sanitize_member_sites( $raw['member_sites'] ?? array() );
+
 		return $clean;
+	}
+
+	/**
+	 * Member sites as { url, name } rows. Blank rows are dropped, as are
+	 * repeats of the same address; an invalid address is kept as typed so
+	 * validate() can quote it.
+	 *
+	 * @param mixed $raw Rows from the client.
+	 * @return array<int, array{url: string, name: string}>
+	 */
+	private static function sanitize_member_sites( $raw ): array {
+		$rows = array();
+		$seen = array();
+		foreach ( is_array( $raw ) ? $raw : array() as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$url = trim( sanitize_text_field( (string) ( $row['url'] ?? '' ) ) );
+			if ( '' === $url ) {
+				continue;
+			}
+			$url = filter_var( $url, FILTER_VALIDATE_URL ) ? esc_url_raw( $url ) : $url;
+			$key = untrailingslashit( strtolower( (string) preg_replace( '#^https?://(www\.)?#i', '', $url ) ) );
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+			$seen[ $key ] = true;
+			$rows[]       = array(
+				'url'  => $url,
+				'name' => sanitize_text_field( (string) ( $row['name'] ?? '' ) ),
+			);
+			if ( count( $rows ) >= self::MAX_MEMBER_SITES ) {
+				break;
+			}
+		}
+		return $rows;
 	}
 
 	/**
@@ -106,6 +152,9 @@ class Schema_Network_Identity {
 	 * @return string[]
 	 */
 	public static function validate( array $settings ): array {
+		if ( 'parent' === $settings['role'] ) {
+			return self::validate_member_sites( $settings['member_sites'] );
+		}
 		if ( 'member' !== $settings['role'] ) {
 			return array();
 		}
@@ -128,6 +177,51 @@ class Schema_Network_Identity {
 		}
 
 		return $errors;
+	}
+
+	/**
+	 * Save-blocking problems with the listed member sites.
+	 *
+	 * @param array $rows Sanitized member site rows.
+	 * @return string[]
+	 */
+	private static function validate_member_sites( array $rows ): array {
+		$errors = array();
+		foreach ( $rows as $row ) {
+			if ( ! filter_var( $row['url'], FILTER_VALIDATE_URL ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: the value the user entered. */
+					__( '"%s" is not a full site address, e.g. https://shop.example.com/', 'schema-plugin' ),
+					$row['url']
+				);
+			} elseif ( self::same_address( $row['url'], home_url( '/' ) ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: the address the user entered. */
+					__( '"%s" is this site itself. List only the other sites.', 'schema-plugin' ),
+					$row['url']
+				);
+			}
+		}
+		return $errors;
+	}
+
+	/**
+	 * Non-blocking guidance shown in the preview.
+	 *
+	 * @param array $settings Sanitized settings.
+	 * @return string[]
+	 */
+	public static function get_warnings( array $settings ): array {
+		if ( 'parent' !== $settings['role'] ) {
+			return array();
+		}
+		if ( 'Person' === Schema_Entity_Registry::get_resolved_schema_type() ) {
+			return array( __( "A person can't have sub-organizations, so nothing is listed. Use a site type that is an organization to list member sites.", 'schema-plugin' ) );
+		}
+		if ( empty( $settings['member_sites'] ) ) {
+			return array( __( 'No member sites listed yet.', 'schema-plugin' ) );
+		}
+		return array();
 	}
 
 	/**
@@ -197,6 +291,13 @@ class Schema_Network_Identity {
 
 	public static function apply_to_entity_node( array $node, string $resolved_type ): array {
 		$settings = self::get_settings();
+		if ( 'parent' === $settings['role'] ) {
+			$members = self::get_member_nodes( $settings );
+			if ( $members && 'Person' !== $resolved_type ) {
+				$node['subOrganization'] = $members;
+			}
+			return $node;
+		}
 		if ( ! self::is_member( $settings ) || 'sub' !== $settings['relationship'] ) {
 			return $node;
 		}
@@ -204,6 +305,33 @@ class Schema_Network_Identity {
 		$property          = 'Person' === $resolved_type ? 'memberOf' : 'parentOrganization';
 		$node[ $property ] = array( '@id' => self::get_parent_ids( $settings, $resolved_type )['entity'] );
 		return $node;
+	}
+
+	/**
+	 * One Organization reference per valid member site, with the @id that
+	 * member uses for itself.
+	 *
+	 * @param array $settings Settings.
+	 * @return array[]
+	 */
+	private static function get_member_nodes( array $settings ): array {
+		$nodes = array();
+		foreach ( (array) $settings['member_sites'] as $row ) {
+			if ( ! filter_var( $row['url'] ?? '', FILTER_VALIDATE_URL ) || self::same_address( $row['url'], home_url( '/' ) ) ) {
+				continue;
+			}
+			$base = trailingslashit( $row['url'] );
+			$node = array(
+				'@type' => 'Organization',
+				'@id'   => $base . '#organization',
+				'url'   => $base,
+			);
+			if ( '' !== ( $row['name'] ?? '' ) ) {
+				$node['name'] = $row['name'];
+			}
+			$nodes[] = $node;
+		}
+		return $nodes;
 	}
 
 	public static function apply_to_website_node( array $node, string $resolved_type ): array {

@@ -1387,3 +1387,9 @@ details.schema-form-section[open] > summary.schema-form-section-head {
 .schema-settings-tab > h2:first-child {
 	margin-top: 0;
 }
+
+.schema-network-member-row {
+	margin-bottom: var(--schema-space-4);
+	padding-bottom: var(--schema-space-3);
+	border-bottom: 1px solid #dcdcde;
+}
