@@ -388,7 +388,7 @@ class Schema_Sanitizer {
 				}
 				$rows = array();
 				foreach ( $value as $row ) {
-					if ( empty( $row['dayOfWeek'] ) || empty( $row['opens'] ) || empty( $row['closes'] ) ) {
+					if ( ! is_array( $row ) || empty( $row['dayOfWeek'] ) || ! is_string( $row['dayOfWeek'] ) || empty( $row['opens'] ) || empty( $row['closes'] ) ) {
 						continue;
 					}
 					$rows[] = array(
