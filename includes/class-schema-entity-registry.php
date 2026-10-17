@@ -20,6 +20,68 @@ class Schema_Entity_Registry {
 	const OPTION_FIELDS = 'schema_plugin_entity_fields';
 	const OPTION_LEGACY = 'schema_plugin_entity_legacy_fields';
 	const OPTION_SEARCH = 'schema_plugin_website_enabled_search';
+	const OPTION_RAW    = 'schema_plugin_entity_raw_override';
+
+	/**
+	 * The saved raw JSON-LD for the sitewide entity, or null when unset. When
+	 * set, it is the entity node instead of the one built from the fields
+	 * (the fields are kept, just not output).
+	 *
+	 * @return array|null
+	 */
+	public static function get_entity_raw_override(): ?array {
+		$json = (string) get_option( self::OPTION_RAW, '' );
+		if ( '' === $json ) {
+			return null;
+		}
+		$decoded = json_decode( $json, true );
+		return is_array( $decoded ) && $decoded ? $decoded : null;
+	}
+
+	/**
+	 * Stores (or, for an empty string, clears) the entity's raw JSON-LD. The
+	 * caller validates first with Schema_Sanitizer::sanitize_raw_node().
+	 *
+	 * @param string $json Raw JSON text, '' to clear.
+	 */
+	public static function set_entity_raw_override( string $json ): void {
+		$decoded = '' === trim( $json ) ? null : json_decode( $json, true );
+		if ( is_array( $decoded ) && $decoded ) {
+			update_option( self::OPTION_RAW, wp_json_encode( $decoded, JSON_UNESCAPED_SLASHES ) );
+		} else {
+			delete_option( self::OPTION_RAW );
+		}
+	}
+
+	/**
+	 * The raw override as the editor shows it (pretty-printed), '' if unset.
+	 *
+	 * @return string
+	 */
+	public static function get_entity_raw_override_text(): string {
+		$raw = self::get_entity_raw_override();
+		return $raw ? (string) wp_json_encode( $raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) : '';
+	}
+
+	/**
+	 * Gives a raw entity node the @type and @id the rest of the graph
+	 * expects when it leaves them out. Every other node references the
+	 * entity by @id (publisher, provider, organizer, ...), so a raw node
+	 * without one must still carry it.
+	 *
+	 * @param array  $raw           Decoded raw node.
+	 * @param string $resolved_type The selected type's schema.org name.
+	 * @return array
+	 */
+	public static function normalize_raw_node( array $raw, string $resolved_type ): array {
+		if ( empty( $raw['@type'] ) ) {
+			$raw = array( '@type' => $resolved_type ) + $raw;
+		}
+		if ( empty( $raw['@id'] ) ) {
+			$raw['@id'] = self::get_entity_id_uri( $resolved_type );
+		}
+		return $raw;
+	}
 
 	public static function get_entity_type(): string {
 		return (string) get_option( self::OPTION_TYPE, '' );
@@ -91,6 +153,10 @@ class Schema_Entity_Registry {
 	}
 
 	public static function get_organization_node(): array {
+		$raw = self::get_entity_raw_override();
+		if ( $raw ) {
+			return self::normalize_raw_node( $raw, self::get_resolved_schema_type() );
+		}
 		return self::build_organization_node( self::get_resolved_schema_type(), self::get_entity_fields() );
 	}
 

@@ -236,6 +236,7 @@ class Schema_Rest_Controller {
 				'legacy_fields'         => $editable['legacy_fields'],
 				'website_enabled_search' => Schema_Entity_Registry::get_website_search_enabled(),
 				'breadcrumbs_enabled'   => Schema_Breadcrumbs::is_enabled(),
+				'raw_override'           => Schema_Entity_Registry::get_entity_raw_override_text(),
 				'wizard_completed_at'   => Schema_Settings::get_wizard_completed_at(),
 			)
 		);
@@ -251,7 +252,20 @@ class Schema_Rest_Controller {
 		$flavor = $flavor ? sanitize_text_field( (string) $flavor ) : null;
 		$fields = (array) $request->get_param( 'fields' );
 
+		// Reject a bad raw override before anything is saved. null leaves the
+		// stored one alone; '' clears it.
+		$raw_override = $request->get_param( 'raw_override' );
+		if ( null !== $raw_override && '' !== trim( (string) $raw_override ) ) {
+			$raw_check = Schema_Sanitizer::sanitize_raw_node( (string) $raw_override );
+			if ( is_wp_error( $raw_check ) ) {
+				return $raw_check;
+			}
+		}
+
 		$result = Schema_Entity_Registry::save_entity( $type_identifier, $flavor, $fields );
+		if ( null !== $raw_override ) {
+			Schema_Entity_Registry::set_entity_raw_override( (string) $raw_override );
+		}
 
 		if ( null !== $request->get_param( 'website_enabled_search' ) ) {
 			Schema_Entity_Registry::set_website_search_enabled( (bool) $request->get_param( 'website_enabled_search' ) );
@@ -273,6 +287,7 @@ class Schema_Rest_Controller {
 
 		$result['website_enabled_search'] = Schema_Entity_Registry::get_website_search_enabled();
 		$result['breadcrumbs_enabled']    = Schema_Breadcrumbs::is_enabled();
+		$result['raw_override']           = Schema_Entity_Registry::get_entity_raw_override_text();
 		$result['first_run']              = $first_run;
 
 		return new WP_REST_Response( $result );
@@ -284,7 +299,19 @@ class Schema_Rest_Controller {
 		return new WP_REST_Response( array( 'rules' => Schema_Default_Rules::get_rules() ) );
 	}
 
-	public static function save_default_rules( WP_REST_Request $request ): WP_REST_Response {
+	/**
+	 * Saves the whole rule list (or resets/seeds it). A rule with invalid raw
+	 * JSON-LD refuses the whole save, naming the rule.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function save_default_rules( WP_REST_Request $request ) {
+		$invalid = Schema_Default_Rules::validate_raw_overrides( (array) $request->get_param( 'rules' ) );
+		if ( $invalid ) {
+			return $invalid;
+		}
+
 		if ( $request->get_param( 'reset_to_type_default' ) ) {
 			$type_key = sanitize_text_field( (string) $request->get_param( 'reset_to_type_default' ) );
 			$rules    = Schema_Default_Rules::seed_defaults( $type_key, true );
@@ -384,6 +411,11 @@ class Schema_Rest_Controller {
 		}
 
 		if ( $raw_override && '' !== trim( (string) $raw_override ) ) {
+			// The site entity's raw JSON-LD: shown as it will be output.
+			if ( $entity_type ) {
+				return self::preview_entity_raw( sanitize_text_field( (string) $entity_type ), (string) $raw_override );
+			}
+
 			$decoded = json_decode( (string) $raw_override, true );
 			if ( ! is_array( $decoded ) ) {
 				return new WP_REST_Response(
@@ -448,6 +480,46 @@ class Schema_Rest_Controller {
 			array(
 				'node'     => null,
 				'warnings' => array(),
+			)
+		);
+	}
+
+	/**
+	 * Preview of the site entity's raw JSON-LD, built the way the live graph
+	 * builds it (a missing type or id filled in), plus a warning when its id
+	 * differs from the one other nodes reference.
+	 *
+	 * @param string $type_identifier Selected entity type key.
+	 * @param string $json            Raw JSON text.
+	 * @return WP_REST_Response
+	 */
+	private static function preview_entity_raw( string $type_identifier, string $json ): WP_REST_Response {
+		$raw = Schema_Sanitizer::sanitize_raw_node( $json );
+		if ( is_wp_error( $raw ) ) {
+			return new WP_REST_Response(
+				array(
+					'node'     => null,
+					'warnings' => array( $raw->get_error_message() ),
+				)
+			);
+		}
+
+		$resolved_type = Schema_Entity_Registry::resolve_schema_type( $type_identifier );
+		$expected_id   = Schema_Entity_Registry::get_entity_id_uri( $resolved_type );
+		$warnings      = array();
+		if ( ! empty( $raw['@id'] ) && $raw['@id'] !== $expected_id ) {
+			$warnings[] = sprintf(
+				/* translators: %s: the site entity's usual @id. */
+				__( 'This @id differs from your site entity\'s usual one (%s), so references to it (publisher, provider, organizer...) will not match it. Leave @id out to keep it.', 'schema-plugin' ),
+				$expected_id
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'node'     => Schema_Entity_Registry::normalize_raw_node( $raw, $resolved_type ),
+				'warnings' => $warnings,
+				'badge'    => Schema_Types::get_badge_for_schema_type( $resolved_type ),
 			)
 		);
 	}

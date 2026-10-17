@@ -88,7 +88,8 @@ class Schema_Completeness {
 			);
 		}
 
-		foreach ( array( self::score_pages(), self::score_default_pages() ) as $pages ) {
+		$raw_pages = array();
+		foreach ( array( self::score_pages( $raw_pages ), self::score_default_pages() ) as $pages ) {
 			if ( $pages ) {
 				foreach ( $pages['items'] as $item ) {
 					$all_scores[] = $item['score'];
@@ -103,9 +104,10 @@ class Schema_Completeness {
 			: $entity['score'];
 
 		return array(
-			'overall' => $overall,
-			'entity'  => $entity,
-			'groups'  => $groups,
+			'overall'   => $overall,
+			'entity'    => $entity,
+			'groups'    => $groups,
+			'raw_pages' => $raw_pages,
 		);
 	}
 
@@ -181,7 +183,7 @@ class Schema_Completeness {
 	 * The "Customized pages" group, or null when no page has a customized
 	 * block. One query for posts with the meta key, capped at MAX_PAGES.
 	 */
-	private static function score_pages(): ?array {
+	private static function score_pages( array &$raw_pages ): ?array {
 		$query = new WP_Query(
 			array(
 				'post_type'              => 'any',
@@ -208,6 +210,7 @@ class Schema_Completeness {
 			}
 			if ( ! empty( $blocks[0]['raw_override'] ) ) {
 				++$raw;
+				$raw_pages[] = self::raw_page_row( (int) $post_id, (string) $blocks[0]['raw_override'] );
 				continue;
 			}
 			$items[] = self::score_page( (int) $post_id, (string) ( $blocks[0]['schema_type'] ?? 'WebPage' ) );
@@ -239,6 +242,27 @@ class Schema_Completeness {
 			'edit_url'    => '',
 			'note'        => implode( ' ', $notes ),
 			'items'       => $items,
+		);
+	}
+
+	/**
+	 * One page that uses a raw JSON-LD override, for the Dashboard list. Read
+	 * from the same post meta the editor saves, so the two always agree.
+	 *
+	 * @param int    $post_id Post ID.
+	 * @param string $json    The stored raw JSON.
+	 * @return array{id: string, name: string, type: string, published: bool, edit_url: string}
+	 */
+	private static function raw_page_row( int $post_id, string $json ): array {
+		$decoded = json_decode( $json, true );
+		$type    = is_array( $decoded ) && isset( $decoded['@type'] ) ? $decoded['@type'] : '';
+		$title   = get_the_title( $post_id );
+		return array(
+			'id'        => (string) $post_id,
+			'name'      => '' !== $title ? $title : __( '(untitled)', 'schema-plugin' ),
+			'type'      => is_array( $type ) ? implode( ', ', array_map( 'strval', $type ) ) : (string) $type,
+			'published' => 'publish' === get_post_status( $post_id ),
+			'edit_url'  => (string) get_edit_post_link( $post_id, 'raw' ),
 		);
 	}
 

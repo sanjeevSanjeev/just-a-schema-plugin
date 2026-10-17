@@ -12,6 +12,7 @@ const bootstrap = window.SchemaPluginData || {};
  */
 export default function HealthDetails( { report } ) {
 	const entries = entriesFrom( report );
+	const rawPages = report.raw_pages || [];
 	const groups = [];
 	entries.forEach( ( entry ) => {
 		const heading = entry.group || __( 'Sitewide', 'schema-plugin' );
@@ -67,7 +68,34 @@ export default function HealthDetails( { report } ) {
 						} ) }
 					</div>
 				) ) }
-				{ 1 === entries.length && (
+				{ rawPages.length > 0 && (
+					<div className="schema-health-group" id="schema-raw-pages">
+						<h3 className="schema-health-group-heading">
+							{ __( 'Pages with raw JSON-LD', 'schema-plugin' ) }
+						</h3>
+						<p className="description">
+							{ __(
+								'These pages output JSON-LD you wrote by hand, so there are no fields to score. Each opens in its editor, in the Schema panel, where you change or remove it.',
+								'schema-plugin'
+							) }
+						</p>
+						<ul className="schema-raw-pages">
+							{ rawPages.map( ( page ) => (
+								<li key={ page.id }>
+									<a href={ page.edit_url }>{ page.name }</a>
+									{ page.type && <span className="schema-raw-page-type"> · { page.type }</span> }
+									{ ! page.published && (
+										<span className="schema-raw-page-status">
+											{ ' · ' }
+											{ __( 'Not published, so not live yet', 'schema-plugin' ) }
+										</span>
+									) }
+								</li>
+							) ) }
+						</ul>
+					</div>
+				) }
+				{ 1 === entries.length && rawPages.length === 0 && (
 					<p className="description">
 						{ bootstrap.contentUrl ? (
 							__( 'Entries you add under Content are scored here too.', 'schema-plugin' )

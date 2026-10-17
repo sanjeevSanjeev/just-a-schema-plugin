@@ -114,6 +114,12 @@ class Schema_Default_Rules {
 
 	private static function build_node( array $rule, int $post_id ): array {
 		$template = isset( $rule['template'] ) && is_array( $rule['template'] ) ? $rule['template'] : array();
+		// A rule's raw JSON-LD replaces its field template; tokens like
+		// {{post_title}} inside it still resolve.
+		$raw = self::get_rule_raw_node( $rule );
+		if ( $raw ) {
+			$template = $raw;
+		}
 		$resolved = Schema_Token_Resolver::resolve_template( $template, $post_id );
 
 		// A template resolving to nothing but a bare @id is a deliberate
@@ -236,13 +242,25 @@ class Schema_Default_Rules {
 				$match['value'] = sanitize_text_field( (string) ( $raw_rule['match']['value'] ?? '' ) );
 			}
 
-			$clean[] = array(
+			$rule = array(
 				'id'          => ! empty( $raw_rule['id'] ) ? sanitize_key( $raw_rule['id'] ) : 'rule_' . strtolower( wp_generate_password( 8, false ) ),
 				'priority'    => $index,
 				'match'       => $match,
 				'schema_type' => sanitize_text_field( $raw_rule['schema_type'] ?? 'WebPage' ),
 				'template'    => self::sanitize_template( $raw_rule['template'] ?? array() ),
 			);
+
+			// Kept only when it is a valid single JSON object; the REST layer
+			// rejects anything else before this runs.
+			$raw_json = isset( $raw_rule['raw_override'] ) ? trim( (string) $raw_rule['raw_override'] ) : '';
+			if ( '' !== $raw_json ) {
+				$raw_node = Schema_Sanitizer::sanitize_raw_node( $raw_json );
+				if ( ! is_wp_error( $raw_node ) ) {
+					$rule['raw_override'] = wp_json_encode( $raw_node, JSON_UNESCAPED_SLASHES );
+				}
+			}
+
+			$clean[] = $rule;
 		}
 
 		if ( empty( $clean ) || 'catch_all' !== end( $clean )['match']['type'] ) {
@@ -257,6 +275,51 @@ class Schema_Default_Rules {
 
 		update_option( self::OPTION, $clean );
 		return $clean;
+	}
+
+	/**
+	 * A rule's decoded raw JSON-LD, or null when it has none (or it's invalid).
+	 *
+	 * @param array $rule Saved rule.
+	 * @return array|null
+	 */
+	private static function get_rule_raw_node( array $rule ): ?array {
+		$json = isset( $rule['raw_override'] ) ? trim( (string) $rule['raw_override'] ) : '';
+		if ( '' === $json ) {
+			return null;
+		}
+		$node = Schema_Sanitizer::sanitize_raw_node( $json );
+		return is_wp_error( $node ) ? null : $node;
+	}
+
+	/**
+	 * First problem with any rule's raw JSON-LD, named by rule number, so the
+	 * REST layer can refuse the save before anything is stored.
+	 *
+	 * @param array $raw_rules Rules as submitted.
+	 * @return WP_Error|null
+	 */
+	public static function validate_raw_overrides( array $raw_rules ): ?WP_Error {
+		foreach ( array_values( $raw_rules ) as $index => $raw_rule ) {
+			$json = isset( $raw_rule['raw_override'] ) ? trim( (string) $raw_rule['raw_override'] ) : '';
+			if ( '' === $json ) {
+				continue;
+			}
+			$node = Schema_Sanitizer::sanitize_raw_node( $json );
+			if ( is_wp_error( $node ) ) {
+				return new WP_Error(
+					$node->get_error_code(),
+					sprintf(
+						/* translators: 1: rule number, 2: what is wrong. */
+						__( 'Rule %1$d: %2$s', 'schema-plugin' ),
+						$index + 1,
+						$node->get_error_message()
+					),
+					array( 'status' => 400 )
+				);
+			}
+		}
+		return null;
 	}
 
 	private static function sanitize_template( array $template ): array {

@@ -454,6 +454,32 @@ class Schema_Sanitizer {
 	}
 
 	/**
+	 * Raw JSON-LD for ONE node (the site entity, or a default rule): valid
+	 * JSON that decodes to a single non-empty object, not a list or a scalar.
+	 *
+	 * @param string $json Raw text from the editor.
+	 * @return array|WP_Error Decoded node on success.
+	 */
+	public static function sanitize_raw_node( string $json ) {
+		$decoded = json_decode( $json, true );
+		if ( ! is_array( $decoded ) ) {
+			return new WP_Error(
+				'schema_plugin_invalid_json',
+				__( 'The raw JSON-LD is not valid JSON.', 'schema-plugin' ),
+				array( 'status' => 400 )
+			);
+		}
+		if ( ! $decoded || array_values( $decoded ) === $decoded ) {
+			return new WP_Error(
+				'schema_plugin_raw_not_object',
+				__( 'The raw JSON-LD must be a single JSON object, like { "@type": "Organization", ... }.', 'schema-plugin' ),
+				array( 'status' => 400 )
+			);
+		}
+		return $decoded;
+	}
+
+	/**
 	 * Non-blocking lint pass -- CLAUDE.md Section 10.5.C. Never prevents a
 	 * save; only surfaces guidance in the UI.
 	 *

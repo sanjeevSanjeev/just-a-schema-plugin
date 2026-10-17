@@ -3,6 +3,7 @@ import { Button, SelectControl, TextControl, Spinner, Notice } from '@wordpress/
 import { __ } from '@wordpress/i18n';
 import { getDefaultRules, saveDefaultRules } from './api';
 import PagePicker from './fields/PagePicker';
+import RawJsonField from './RawJsonField';
 
 const bootstrap = window.SchemaPluginData || {};
 const POST_TYPE_OPTIONS = bootstrap.postTypeOptions || [];
@@ -300,11 +301,23 @@ function RuleRow( { rule, index, total, onUpdate, onRemove, onMove } ) {
 
 			<details className="schema-rule-advanced">
 				<summary>
-					{ __( 'Includes:', 'schema-plugin' ) } { summarizeTemplate( rule.template ) }
+					{ rule.raw_override && rule.raw_override.trim()
+						? __( 'Includes: raw JSON-LD (replaces the fields)', 'schema-plugin' )
+						: <>{ __( 'Includes:', 'schema-plugin' ) } { summarizeTemplate( rule.template ) }</> }
 				</summary>
 				<TemplateEditor
 					template={ rule.template }
 					onChange={ ( template ) => onUpdate( { ...rule, template } ) }
+				/>
+				<RawJsonField
+					label={ __( 'Raw JSON-LD for this rule (advanced)', 'schema-plugin' ) }
+					help={ __(
+						'If filled in, this replaces the property list above for pages this rule matches. Tokens such as {{post_title}}, {{permalink}} and {{organization_id}} still work inside it. Leave it empty to use the list.',
+						'schema-plugin'
+					) }
+					value={ rule.raw_override || '' }
+					onChange={ ( raw_override ) => onUpdate( { ...rule, raw_override } ) }
+					rows={ 10 }
 				/>
 			</details>
 		</div>
@@ -324,6 +337,7 @@ export default function DefaultRulesManager() {
 	const [ rules, setRules ] = useState( null );
 	const [ saving, setSaving ] = useState( false );
 	const [ saved, setSaved ] = useState( false );
+	const [ error, setError ] = useState( '' );
 
 	useEffect( () => {
 		getDefaultRules().then( ( res ) => setRules( res.rules ) );
@@ -364,11 +378,14 @@ export default function DefaultRulesManager() {
 
 	const save = () => {
 		setSaving( true );
-		saveDefaultRules( rules ).then( ( res ) => {
-			setRules( res.rules );
-			setSaving( false );
-			setSaved( true );
-		} );
+		setError( '' );
+		saveDefaultRules( rules )
+			.then( ( res ) => {
+				setRules( res.rules );
+				setSaved( true );
+			} )
+			.catch( ( err ) => setError( err.message || __( 'Something went wrong.', 'schema-plugin' ) ) )
+			.finally( () => setSaving( false ) );
 	};
 
 	if ( ! rules ) {
@@ -409,6 +426,11 @@ export default function DefaultRulesManager() {
 				{ saved && (
 					<Notice status="success" isDismissible={ false }>
 						{ __( 'Saved.', 'schema-plugin' ) }
+					</Notice>
+				) }
+				{ error && (
+					<Notice status="error" isDismissible={ false }>
+						{ error }
 					</Notice>
 				) }
 			</div>

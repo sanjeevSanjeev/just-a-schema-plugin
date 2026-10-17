@@ -95,6 +95,15 @@ export default function PostBlockForm( { block, onChange, postId } ) {
 				</span>
 			</div>
 
+			{ usingRaw && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'This page outputs your raw JSON-LD below. The fields are hidden and ignored while it is filled in; clear the box to bring them back.',
+						'schema-plugin'
+					) }
+				</Notice>
+			) }
+
 			{ ! usingRaw && (
 				<div className="schema-field-group">
 					{ orderedFields( fieldDefs ).map( ( { key, def } ) => (

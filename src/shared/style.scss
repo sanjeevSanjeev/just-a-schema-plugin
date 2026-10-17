@@ -1393,3 +1393,21 @@ details.schema-form-section[open] > summary.schema-form-section-head {
 	padding-bottom: var(--schema-space-3);
 	border-bottom: 1px solid #dcdcde;
 }
+
+/* Raw JSON-LD boxes (site entity, default rules) and the dashboard list of raw pages. */
+.schema-raw-json textarea {
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	tab-size: 2;
+}
+
+.schema-raw-pages {
+	margin: 8px 0 0;
+	padding-left: 24px;
+	list-style: disc;
+}
+
+.schema-raw-pages li {
+	margin: 0 0 4px;
+}

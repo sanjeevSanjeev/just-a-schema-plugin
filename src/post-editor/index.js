@@ -62,6 +62,18 @@ function SchemaPanel() {
 		}
 	};
 
+	// Opens the raw box already holding what this page outputs now, so the
+	// user edits the live JSON instead of starting from a blank box.
+	const customizeAsRaw = () => {
+		const live = state.resolved_preview;
+		setState( { ...state, source: 'custom' } );
+		setDraftBlock( {
+			...draftBlock,
+			schema_type: live?.[ '@type' ] && 'string' === typeof live[ '@type' ] ? live[ '@type' ] : draftBlock.schema_type,
+			raw_override: live ? JSON.stringify( live, null, 2 ) : '',
+		} );
+	};
+
 	const save = () => {
 		setSaving( true );
 		savePostSchema( postId, [ draftBlock ] ).then( ( res ) => {
@@ -106,6 +118,9 @@ function SchemaPanel() {
 					<div className="schema-field-group">
 						<Button variant="primary" onClick={ customize }>
 							{ __( 'Customize schema for this page', 'schema-plugin' ) }
+						</Button>
+						<Button variant="secondary" onClick={ customizeAsRaw }>
+							{ __( 'Write raw JSON-LD for this page', 'schema-plugin' ) }
 						</Button>
 						<Button variant="link" href={ window.SchemaPluginData?.defaultRulesUrl }>
 							{ __( 'Edit the default rule', 'schema-plugin' ) }

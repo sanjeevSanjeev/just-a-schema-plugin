@@ -4,6 +4,7 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEntitySections, filledLabel } from '../shared/EntityForm';
 import { getEntity, saveEntity } from '../shared/api';
 import { getWizardCopy } from '../shared/wizardCopy';
+import RawJsonField from '../shared/RawJsonField';
 import PreviewPanel from './PreviewPanel';
 
 const bootstrap = window.SchemaPluginData || {};
@@ -54,6 +55,7 @@ export default function EntityTab() {
 				fields: res.fields,
 				website_enabled_search: res.website_enabled_search,
 				breadcrumbs_enabled: res.breadcrumbs_enabled,
+				raw_override: res.raw_override || '',
 			};
 			setValue( loaded );
 			setSavedSnapshot( JSON.stringify( loaded ) );
@@ -118,6 +120,7 @@ export default function EntityTab() {
 					fields: res.fields,
 					website_enabled_search: res.website_enabled_search,
 					breadcrumbs_enabled: res.breadcrumbs_enabled,
+					raw_override: res.raw_override || '',
 				};
 				setValue( next );
 				setSavedSnapshot( JSON.stringify( next ) );
@@ -136,6 +139,11 @@ export default function EntityTab() {
 				__( '%d of 2 on', 'schema-plugin' ),
 				( value.website_enabled_search ? 1 : 0 ) + ( value.breadcrumbs_enabled ? 1 : 0 )
 			),
+		},
+		{
+			key: 'raw',
+			title: __( 'Raw JSON-LD (advanced)', 'schema-plugin' ),
+			status: value.raw_override.trim() ? __( 'In use', 'schema-plugin' ) : __( 'Off', 'schema-plugin' ),
 		},
 	];
 	const current = allSections.find( ( s ) => s.key === active ) || allSections[ 0 ];
@@ -247,6 +255,27 @@ export default function EntityTab() {
 								onChange={ ( breadcrumbs_enabled ) => setValue( { ...value, breadcrumbs_enabled } ) }
 							/>
 						</>
+					) : 'raw' === current.key ? (
+						<>
+							{ value.raw_override.trim() && (
+								<Notice status="warning" isDismissible={ false }>
+									{ __(
+										'In use: this replaces your site entity on every page. The fields in the other sections are kept, but not output while this is filled in.',
+										'schema-plugin'
+									) }
+								</Notice>
+							) }
+							<RawJsonField
+								label={ __( 'Site entity as raw JSON-LD', 'schema-plugin' ) }
+								help={ __(
+									'One JSON object that becomes your Organization or Person node. Leave @id out to keep the one other nodes point at (publisher, provider...). Clear the box to go back to the fields.',
+									'schema-plugin'
+								) }
+								value={ value.raw_override }
+								onChange={ ( raw_override ) => setValue( { ...value, raw_override } ) }
+								rows={ 14 }
+							/>
+						</>
 					) : (
 						renderSectionBody( current )
 					) }
@@ -290,7 +319,12 @@ export default function EntityTab() {
 				open={ previewOpen }
 				onClose={ closePreview }
 				onResult={ onPreviewResult }
-				payload={ { entity_type: value.entity_type, flavor: value.flavor, fields: value.fields } }
+				payload={ {
+					entity_type: value.entity_type,
+					flavor: value.flavor,
+					fields: value.fields,
+					...( value.raw_override.trim() ? { raw_override: value.raw_override } : {} ),
+				} }
 			/>
 		</div>
 	);
