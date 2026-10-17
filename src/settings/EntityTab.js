@@ -53,6 +53,7 @@ export default function EntityTab() {
 				flavor: res.flavor,
 				fields: res.fields,
 				website_enabled_search: res.website_enabled_search,
+				breadcrumbs_enabled: res.breadcrumbs_enabled,
 			};
 			setValue( loaded );
 			setSavedSnapshot( JSON.stringify( loaded ) );
@@ -112,7 +113,12 @@ export default function EntityTab() {
 		setError( '' );
 		saveEntity( value )
 			.then( ( res ) => {
-				const next = { ...value, fields: res.fields, website_enabled_search: res.website_enabled_search };
+				const next = {
+					...value,
+					fields: res.fields,
+					website_enabled_search: res.website_enabled_search,
+					breadcrumbs_enabled: res.breadcrumbs_enabled,
+				};
 				setValue( next );
 				setSavedSnapshot( JSON.stringify( next ) );
 			} )
@@ -125,7 +131,11 @@ export default function EntityTab() {
 		{
 			key: 'search',
 			title: __( 'Search appearance', 'schema-plugin' ),
-			status: value.website_enabled_search ? __( 'On', 'schema-plugin' ) : __( 'Off', 'schema-plugin' ),
+			status: sprintf(
+				/* translators: %d: number of search-appearance options that are on (0-2). */
+				__( '%d of 2 on', 'schema-plugin' ),
+				( value.website_enabled_search ? 1 : 0 ) + ( value.breadcrumbs_enabled ? 1 : 0 )
+			),
 		},
 	];
 	const current = allSections.find( ( s ) => s.key === active ) || allSections[ 0 ];
@@ -215,15 +225,28 @@ export default function EntityTab() {
 					</div>
 
 					{ 'search' === current.key ? (
-						<ToggleControl
-							label={ __( 'Sitelinks search box', 'schema-plugin' ) }
-							help={ __(
-								'Adds SearchAction markup so Google can show a search box for your site in results.',
-								'schema-plugin'
-							) }
-							checked={ !! value.website_enabled_search }
-							onChange={ ( website_enabled_search ) => setValue( { ...value, website_enabled_search } ) }
-						/>
+						<>
+							<ToggleControl
+								label={ __( 'Sitelinks search box', 'schema-plugin' ) }
+								help={ __(
+									'Adds SearchAction markup so Google can show a search box for your site in results.',
+									'schema-plugin'
+								) }
+								checked={ !! value.website_enabled_search }
+								onChange={ ( website_enabled_search ) =>
+									setValue( { ...value, website_enabled_search } )
+								}
+							/>
+							<ToggleControl
+								label={ __( 'Breadcrumbs', 'schema-plugin' ) }
+								help={ __(
+									'Adds BreadcrumbList markup (Home › category › page) so Google can show the page’s place in your site. Not added to the homepage.',
+									'schema-plugin'
+								) }
+								checked={ !! value.breadcrumbs_enabled }
+								onChange={ ( breadcrumbs_enabled ) => setValue( { ...value, breadcrumbs_enabled } ) }
+							/>
+						</>
 					) : (
 						renderSectionBody( current )
 					) }

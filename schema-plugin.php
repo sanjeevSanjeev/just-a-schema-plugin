@@ -35,6 +35,7 @@ spl_autoload_register(
 			'Schema_Activation'                    => 'class-schema-activation.php',
 			'Schema_Admin'                         => 'class-schema-admin.php',
 			'Schema_Author_Profile'                => 'class-schema-author-profile.php',
+			'Schema_Breadcrumbs'                   => 'class-schema-breadcrumbs.php',
 			'Schema_Compat'                        => 'class-schema-compat.php',
 			'Schema_Completeness'                  => 'class-schema-completeness.php',
 			'Schema_Dashboard'                     => 'class-schema-dashboard.php',

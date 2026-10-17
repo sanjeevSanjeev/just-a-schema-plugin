@@ -123,6 +123,19 @@ class Schema_Graph_Builder {
 			$graph = self::add_author_archive_nodes( $graph, $primary_index );
 		}
 
+		// 5. Breadcrumb trail: its own node, referenced from the page's node
+		// when that is a WebPage (Article and the like have no such property).
+		$page_node  = null !== $primary_index ? $graph[ $primary_index ] : null;
+		$breadcrumb = Schema_Breadcrumbs::build_node( $page_node );
+		if ( $breadcrumb ) {
+			$graph[] = $breadcrumb;
+			if ( null !== $primary_index
+				&& Schema_Breadcrumbs::is_page_type( $graph[ $primary_index ]['@type'] ?? null )
+				&& ! isset( $graph[ $primary_index ]['breadcrumb'] ) ) {
+				$graph[ $primary_index ]['breadcrumb'] = array( '@id' => $breadcrumb['@id'] );
+			}
+		}
+
 		/**
 		 * Filter: allow advanced/manual adjustment of the graph via code —
 		 * the supported extension point for anything not covered by the UI

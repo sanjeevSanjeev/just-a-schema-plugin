@@ -20,6 +20,7 @@ class Schema_Settings {
 	const OPTION_EXCLUDE_404        = 'schema_plugin_exclude_404';
 	const OPTION_EXCLUDE_NOINDEX    = 'schema_plugin_exclude_noindex';
 	const OPTION_WIZARD_COMPLETED   = 'schema_plugin_wizard_completed_at';
+	const OPTION_BREADCRUMBS        = 'schema_plugin_breadcrumbs';
 
 	/**
 	 * @param string $key     One of 'exclude_search', 'exclude_404', 'exclude_noindex'.
@@ -127,6 +128,16 @@ class Schema_Settings {
 		if ( '' === get_option( self::OPTION_EXCLUDE_NOINDEX, '' ) ) {
 			update_option( self::OPTION_EXCLUDE_NOINDEX, true );
 		}
+	}
+
+	/**
+	 * Stored as '1' / '0': update_option() skips a `false` write when the
+	 * option doesn't exist yet, which would make "off" impossible to save.
+	 *
+	 * @param bool $enabled Whether breadcrumbs are emitted.
+	 */
+	public static function set_breadcrumbs_enabled( bool $enabled ): void {
+		update_option( self::OPTION_BREADCRUMBS, $enabled ? '1' : '0' );
 	}
 
 	public static function get_wizard_completed_at() {

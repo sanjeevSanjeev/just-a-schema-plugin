@@ -235,6 +235,7 @@ class Schema_Rest_Controller {
 				'fields'                => $editable['fields'],
 				'legacy_fields'         => $editable['legacy_fields'],
 				'website_enabled_search' => Schema_Entity_Registry::get_website_search_enabled(),
+				'breadcrumbs_enabled'   => Schema_Breadcrumbs::is_enabled(),
 				'wizard_completed_at'   => Schema_Settings::get_wizard_completed_at(),
 			)
 		);
@@ -256,6 +257,10 @@ class Schema_Rest_Controller {
 			Schema_Entity_Registry::set_website_search_enabled( (bool) $request->get_param( 'website_enabled_search' ) );
 		}
 
+		if ( null !== $request->get_param( 'breadcrumbs_enabled' ) ) {
+			Schema_Settings::set_breadcrumbs_enabled( (bool) $request->get_param( 'breadcrumbs_enabled' ) );
+		}
+
 		$locked_types = Schema_Types::get_locked_types();
 		$first_run    = false;
 
@@ -267,6 +272,7 @@ class Schema_Rest_Controller {
 		}
 
 		$result['website_enabled_search'] = Schema_Entity_Registry::get_website_search_enabled();
+		$result['breadcrumbs_enabled']    = Schema_Breadcrumbs::is_enabled();
 		$result['first_run']              = $first_run;
 
 		return new WP_REST_Response( $result );
