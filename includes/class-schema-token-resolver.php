@@ -37,11 +37,10 @@ class Schema_Token_Resolver {
 
 		switch ( $token ) {
 			case 'post_title':
-				return get_the_title( $post_id );
+				return self::to_plain_text( get_the_title( $post_id ) );
 
 			case 'post_excerpt':
-				$excerpt = get_the_excerpt( $post_id );
-				return $excerpt ? wp_strip_all_tags( $excerpt ) : '';
+				return self::to_plain_text( get_the_excerpt( $post_id ) );
 
 			case 'featured_image':
 				$image_id = get_post_thumbnail_id( $post_id );
@@ -92,6 +91,18 @@ class Schema_Token_Resolver {
 			default:
 				return '';
 		}
+	}
+
+	/**
+	 * Titles and excerpts come back from WordPress texturized, with HTML
+	 * entities (&#8217;, &hellip;) that are wrong in JSON-LD text, which
+	 * is plain text.
+	 *
+	 * @param string $text Title or excerpt as WordPress returns it.
+	 * @return string
+	 */
+	private static function to_plain_text( string $text ): string {
+		return trim( html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES, 'UTF-8' ) );
 	}
 
 	public static function get_homepage_id(): int {
