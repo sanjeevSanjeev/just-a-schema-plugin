@@ -312,7 +312,7 @@ class Schema_Admin {
 			'postTypeOptions'        => Schema_Types::get_post_type_options(),
 			'fieldDefs'              => array(
 				'tier1'         => Schema_Types::TIER1_COMMON_FIELDS,
-				'localBusiness' => Schema_Types::LOCAL_BUSINESS_FIELDS,
+				'localBusiness' => Schema_Types::get_local_business_fields(),
 				'entityExtra'   => Schema_Types::get_entity_extra_fields(),
 				'genericBlock'  => Schema_Types::GENERIC_BLOCK_FIELDS,
 				'block'         => Schema_Types::get_block_field_defs(),
@@ -323,6 +323,10 @@ class Schema_Admin {
 			// CLAUDE.md 10.6.C: pre-fill currency from the store when known,
 			// otherwise leave blank rather than guess.
 			'defaultCurrency'        => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
+			// Shown as the URL field's placeholder: the address it falls back to
+			// when left blank. The field is not pre-filled, because a blank url is
+			// what lets Network Identity supply the parent site's.
+			'homeUrl'                => home_url( '/' ),
 			// BCP 47 tag for Intl.DisplayNames (country/currency names).
 			'locale'                 => str_replace( '_', '-', get_user_locale() ),
 			'textDomain'             => 'schema-plugin',

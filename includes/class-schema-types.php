@@ -355,6 +355,32 @@ class Schema_Types {
 	}
 
 	/**
+	 * LOCAL_BUSINESS_FIELDS with translated labels, for the admin UI. Without
+	 * a label the form falls back to the property name ("telephone",
+	 * "department"). The words match the Dashboard's missing-field lists.
+	 */
+	public static function get_local_business_fields(): array {
+		$labels = array(
+			'address'                   => __( 'Address', 'schema-plugin' ),
+			'telephone'                 => __( 'Telephone', 'schema-plugin' ),
+			'priceRange'                => __( 'Price range', 'schema-plugin' ),
+			'openingHoursSpecification' => __( 'Opening hours', 'schema-plugin' ),
+			'geo'                       => __( 'Map coordinates', 'schema-plugin' ),
+			'department'                => __( 'Departments', 'schema-plugin' ),
+			'aggregateRating'           => __( 'Aggregate rating', 'schema-plugin' ),
+			'review'                    => __( 'Review', 'schema-plugin' ),
+		);
+
+		$fields = self::LOCAL_BUSINESS_FIELDS;
+		foreach ( $labels as $key => $label ) {
+			if ( isset( $fields[ $key ] ) ) {
+				$fields[ $key ]['label'] = $label;
+			}
+		}
+		return $fields;
+	}
+
+	/**
 	 * Generic minimal field set for per-post schema blocks whose
 	 * schema_type isn't LocalBusiness -- CLAUDE.md Section 8 excludes
 	 * per-type field verification beyond LocalBusiness for MVP, so every

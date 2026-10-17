@@ -276,6 +276,7 @@ export function useEntitySections( { value, onChange } ) {
 					<UrlField
 						label={ __( 'URL', 'schema-plugin' ) }
 						value={ fields.url }
+						placeholder={ bootstrap.homeUrl }
 						onChange={ ( v ) => setField( 'url', v ) }
 						help={ __( 'Defaults to your homepage if left blank.', 'schema-plugin' ) }
 					/>

@@ -25,7 +25,7 @@ function isValidUrl( value ) {
  * Shared <UrlField> -- CLAUDE.md Section 10.6.A. Inline client-side check,
  * red-outline + text error (never color alone) on invalid format.
  */
-export default function UrlField( { label, value, onChange, help, required = false } ) {
+export default function UrlField( { label, value, onChange, help, placeholder, required = false } ) {
 	const [ touched, setTouched ] = useState( false );
 	const valid = isValidUrl( value );
 	const showError = touched && ! valid;
@@ -39,6 +39,7 @@ export default function UrlField( { label, value, onChange, help, required = fal
 				value={ value || '' }
 				onChange={ onChange }
 				onBlur={ () => setTouched( true ) }
+				placeholder={ placeholder }
 				help={ help }
 			/>
 			{ showError && (
